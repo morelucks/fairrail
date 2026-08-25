@@ -112,4 +112,40 @@ contract FairRailHookTest is Test {
         assertEq(lpRevenue, 0.8 ether);
         assertEq(auction.getAccruedLpRevenue(poolId), 0.8 ether);
     }
+
+    function test_BeforeSwapHookCallback() public {
+        SwapParams memory params = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        (bytes4 selector,,) = hook.beforeSwap(traderA, poolKey, params, "");
+        assertEq(selector, FairRailHook.beforeSwap.selector);
+
+        bytes32 poolId = keccak256(abi.encode(poolKey));
+        (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
+        assertEq(matchedVol, 4 ether); // 40% of 10 ether
+    }
+
+    function test_AfterSwapHookCallback() public {
+        bytes32 poolId = keccak256(abi.encode(poolKey));
+
+        // Submit searcher bid first
+        vm.deal(searcher, 2 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 1 ether}(poolId);
+
+        SwapParams memory params = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        (bytes4 selector,) = hook.afterSwap(traderA, poolKey, params, 0, "");
+        assertEq(selector, FairRailHook.afterSwap.selector);
+
+        (, uint256 totalLpMev) = hook.getPoolMetrics(poolId);
+        assertEq(totalLpMev, 0.8 ether);
+    }
 }
