@@ -47,4 +47,55 @@ contract IntentMatcher {
     error InvalidSignature();
     error IntentAlreadyExecuted();
     error IncompatibleTokens();
+
+    /**
+     * @notice Generates unique hash for a trade intent
+     */
+    function getSchemaHash(TradeIntent calldata intent) public pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                intent.trader,
+                intent.tokenIn,
+                intent.tokenOut,
+                intent.amountIn,
+                intent.minAmountOut,
+                intent.nonce,
+                intent.deadline
+            )
+        );
+    }
+
+    /**
+     * @notice Simulates or executes matching between two counter-intents
+     * @param intentA User A buying tokenOut for tokenIn
+     * @param intentB User B buying tokenIn for tokenOut
+     */
+    function matchDirectIntents(
+        TradeIntent calldata intentA,
+        TradeIntent calldata intentB
+    ) external returns (uint256 matchedInA, uint256 matchedInB) {
+        if (block.timestamp > intentA.deadline || block.timestamp > intentB.deadline) {
+            revert IntentExpired();
+        }
+        if (intentA.tokenIn != intentB.tokenOut || intentA.tokenOut != intentB.tokenIn) {
+            revert IncompatibleTokens();
+        }
+
+        bytes32 hashA = getSchemaHash(intentA);
+        bytes32 hashB = getSchemaHash(intentB);
+
+        if (executedIntents[hashA] || executedIntents[hashB]) {
+            revert IntentAlreadyExecuted();
+        }
+
+        // Calculate fill size based on maximum overlap
+        matchedInA = intentA.amountIn < intentB.minAmountOut ? intentA.amountIn : intentB.minAmountOut;
+        matchedInB = intentB.amountIn < intentA.minAmountOut ? intentB.amountIn : intentA.minAmountOut;
+
+        executedIntents[hashA] = true;
+        executedIntents[hashB] = true;
+
+        emit IntentMatched(hashA, intentA.trader, intentA.tokenIn, intentA.tokenOut, matchedInA, matchedInB);
+        emit IntentMatched(hashB, intentB.trader, intentB.tokenIn, intentB.tokenOut, matchedInB, matchedInA);
+    }
 }
