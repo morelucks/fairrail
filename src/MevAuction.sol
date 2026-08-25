@@ -16,12 +16,19 @@ contract MevAuction {
 
     address public immutable hook;
     mapping(bytes32 => Bid) public highestBids;
+    mapping(bytes32 => uint256) public totalLpRevenuePool;
 
     event BidSubmitted(
         bytes32 indexed poolId,
         address indexed searcher,
         uint256 bidAmount,
         uint256 blockNumber
+    );
+
+    event AuctionSettled(
+        bytes32 indexed poolId,
+        address indexed winner,
+        uint256 revenueToLPs
     );
 
     error Unauthorized();
@@ -62,5 +69,28 @@ contract MevAuction {
         });
 
         emit BidSubmitted(poolId, msg.sender, msg.value, block.number);
+    }
+
+    /**
+     * @notice Settles auction for a pool block and records proceeds for LP fee distribution
+     * @param poolId Identifier of the Uniswap v4 pool
+     */
+    function settleAuction(bytes32 poolId) external onlyHook returns (uint256 lpRevenue) {
+        Bid memory winningBid = highestBids[poolId];
+        if (winningBid.amount > 0 && winningBid.blockNumber == block.number) {
+            // Allocate 80% directly to LP pool revenue, 20% to hook protocol treasury/incentives
+            lpRevenue = (winningBid.amount * 80) / 100;
+            totalLpRevenuePool[poolId] += lpRevenue;
+
+            delete highestBids[poolId];
+            emit AuctionSettled(poolId, winningBid.searcher, lpRevenue);
+        }
+    }
+
+    /**
+     * @notice Returns total accrued MEV/LVR yield captured for a given pool
+     */
+    function getAccruedLpRevenue(bytes32 poolId) external view returns (uint256) {
+        return totalLpRevenuePool[poolId];
     }
 }
