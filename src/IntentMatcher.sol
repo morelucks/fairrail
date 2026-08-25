@@ -98,4 +98,19 @@ contract IntentMatcher {
         emit IntentMatched(hashA, intentA.trader, intentA.tokenIn, intentA.tokenOut, matchedInA, matchedInB);
         emit IntentMatched(hashB, intentB.trader, intentB.tokenIn, intentB.tokenOut, matchedInB, matchedInA);
     }
+
+    /**
+     * @notice Evaluates if incoming swap input can be partially or fully offset by pending batch intents
+     */
+    function processBatchMatching(
+        address tokenIn,
+        address tokenOut,
+        uint256 incomingAmount
+    ) external pure returns (MatchResult memory result) {
+        // Mock matching ratio logic (e.g. matching up to 40% of trade off-chain in demo simulation)
+        uint256 simulatedMatch = (incomingAmount * 40) / 100;
+        result.matchedAmount = simulatedMatch;
+        result.remainingAmountIn = incomingAmount - simulatedMatch;
+        result.filledAmountOut = simulatedMatch; // 1:1 baseline rate for matched portion
+    }
 }
