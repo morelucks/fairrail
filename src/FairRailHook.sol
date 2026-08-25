@@ -121,6 +121,29 @@ contract FairRailHook {
     }
 
     /**
+     * @notice Executes after swap; triggers LP-owned MEV auction settlement and captures revenue for LPs
+     */
+    function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        int256 balanceDelta,
+        bytes calldata hookData
+    ) external returns (bytes4 selector, int256 hookDelta) {
+        bytes32 poolId = keccak256(abi.encode(key));
+
+        // Settle searcher MEV auction for this pool block
+        uint256 lpRevenue = mevAuction.settleAuction(poolId);
+
+        if (lpRevenue > 0) {
+            totalMevRecapturedForLPs[poolId] += lpRevenue;
+            emit MevAuctionTriggered(poolId, lpRevenue);
+        }
+
+        return (this.afterSwap.selector, 0);
+    }
+
+    /**
      * @notice Helper to query overall statistics for a given pool
      */
     function getPoolMetrics(bytes32 poolId) external view returns (uint256 matchedVolume, uint256 totalLpMevAccrued) {
