@@ -1,0 +1,17 @@
+# Compiler outputs
+out/
+cache/
+
+# Dependencies
+lib/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+
+# Environment variables
+.env
