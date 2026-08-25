@@ -92,6 +92,35 @@ contract FairRailHook {
     }
 
     /**
+     * @notice Executes before swap; checks for available off-chain/batch intent matches before AMM routing
+     */
+    function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        bytes calldata hookData
+    ) external returns (bytes4 selector, int256 beforeSwapDelta, uint24 lpFeeOverride) {
+        bytes32 poolId = keccak256(abi.encode(key));
+        
+        uint256 amountIn = params.amountSpecified < 0 ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
+
+        // Process private intent matching
+        (address tokenIn, address tokenOut) = params.zeroForOne
+            ? (key.currency0, key.currency1)
+            : (key.currency1, key.currency0);
+
+        IntentMatcher.MatchResult memory matchResult = intentMatcher.processBatchMatching(tokenIn, tokenOut, amountIn);
+
+        if (matchResult.matchedAmount > 0) {
+            totalMatchedVolume[poolId] += matchResult.matchedAmount;
+            emit PrivateIntentMatched(poolId, matchResult.matchedAmount, matchResult.remainingAmountIn);
+        }
+
+        // Return standard selector and fee override
+        return (this.beforeSwap.selector, 0, 0);
+    }
+
+    /**
      * @notice Helper to query overall statistics for a given pool
      */
     function getPoolMetrics(bytes32 poolId) external view returns (uint256 matchedVolume, uint256 totalLpMevAccrued) {
