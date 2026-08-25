@@ -91,4 +91,25 @@ contract FairRailHookTest is Test {
         assertEq(res.matchedAmount, 40 ether);
         assertEq(res.remainingAmountIn, 60 ether);
     }
+
+    function test_MevAuctionBiddingAndSettlement() public {
+        bytes32 poolId = keccak256(abi.encode(poolKey));
+
+        // Searcher bids 1 ETH on the pool MEV auction
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 1 ether}(poolId);
+
+        (address highestSearcher, uint256 bidAmount,,) = auction.highestBids(poolId);
+        assertEq(highestSearcher, searcher);
+        assertEq(bidAmount, 1 ether);
+
+        // Prank as hook to settle auction
+        vm.prank(address(hook));
+        uint256 lpRevenue = auction.settleAuction(poolId);
+
+        // 80% of 1 ETH = 0.8 ETH allocated to LPs
+        assertEq(lpRevenue, 0.8 ether);
+        assertEq(auction.getAccruedLpRevenue(poolId), 0.8 ether);
+    }
 }
