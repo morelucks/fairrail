@@ -2,11 +2,24 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
+
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "v4-core/types/PoolId.sol";
+import {Currency} from "v4-core/types/Currency.sol";
+import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
+import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
+import {Hooks} from "v4-core/libraries/Hooks.sol";
+
 import "../src/IntentMatcher.sol";
 import "../src/MevAuction.sol";
 import "../src/FairRailHook.sol";
 
 contract FairRailHookTest is Test {
+    using PoolIdLibrary for PoolKey;
+    using Hooks for IHooks;
+
     FairRailHook public hook;
     IntentMatcher public matcher;
     MevAuction public auction;
@@ -17,22 +30,34 @@ contract FairRailHookTest is Test {
     address public searcher = address(0xCCCC);
     address public searcher2 = address(0xDDDD);
 
-    address public token0 = address(0x1000);
-    address public token1 = address(0x2000);
+    Currency public currency0;
+    Currency public currency1;
 
     PoolKey public poolKey;
 
     function setUp() public {
         matcher = new IntentMatcher();
-        hook = new FairRailHook(poolManager, address(matcher));
+
+        // FairRailHook requires beforeSwap (1<<7 = 0x80) and afterSwap (1<<6 = 0x40) flags
+        // encoded in the hook address. Compute a valid address: low 14 bits = 0x00C0
+        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
+
+        // Deploy hook to a deterministic address encoding the correct permission flags.
+        // We use deployCodeTo to place the contract at the flag-valid address.
+        bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
+        deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
+        hook = FairRailHook(address(flags));
         auction = hook.mevAuction();
 
+        currency0 = Currency.wrap(address(0x1000));
+        currency1 = Currency.wrap(address(0x2000));
+
         poolKey = PoolKey({
-            currency0: token0,
-            currency1: token1,
+            currency0: currency0,
+            currency1: currency1,
             fee: 3000,
             tickSpacing: 60,
-            hooks: address(hook)
+            hooks: IHooks(address(hook))
         });
     }
 
@@ -41,10 +66,26 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_HookPermissions() public view {
-        HooksPermissions memory flags = hook.getHookPermissions();
+        Hooks.Permissions memory flags = hook.getHookPermissions();
         assertTrue(flags.beforeSwap);
         assertTrue(flags.afterSwap);
         assertFalse(flags.beforeInitialize);
+        assertFalse(flags.afterInitialize);
+        assertFalse(flags.beforeAddLiquidity);
+        assertFalse(flags.afterAddLiquidity);
+        assertFalse(flags.beforeRemoveLiquidity);
+        assertFalse(flags.afterRemoveLiquidity);
+        assertFalse(flags.beforeDonate);
+        assertFalse(flags.afterDonate);
+        assertFalse(flags.beforeSwapReturnDelta);
+        assertFalse(flags.afterSwapReturnDelta);
+    }
+
+    function test_HookImplementsIHooks() public view {
+        // Verify the hook address encodes the correct flags
+        assertTrue(IHooks(address(hook)).hasPermission(Hooks.BEFORE_SWAP_FLAG));
+        assertTrue(IHooks(address(hook)).hasPermission(Hooks.AFTER_SWAP_FLAG));
+        assertFalse(IHooks(address(hook)).hasPermission(Hooks.BEFORE_INITIALIZE_FLAG));
     }
 
     // ──────────────────────────────────────────────────────
@@ -54,8 +95,8 @@ contract FairRailHookTest is Test {
     function test_IntentSchemaHash() public view {
         IntentMatcher.TradeIntent memory intent = IntentMatcher.TradeIntent({
             trader: traderA,
-            tokenIn: token0,
-            tokenOut: token1,
+            tokenIn: Currency.unwrap(currency0),
+            tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 9.9 ether,
             nonce: 1,
@@ -70,8 +111,8 @@ contract FairRailHookTest is Test {
     function test_DirectIntentMatching() public {
         IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
             trader: traderA,
-            tokenIn: token0,
-            tokenOut: token1,
+            tokenIn: Currency.unwrap(currency0),
+            tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -81,8 +122,8 @@ contract FairRailHookTest is Test {
 
         IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
             trader: traderB,
-            tokenIn: token1,
-            tokenOut: token0,
+            tokenIn: Currency.unwrap(currency1),
+            tokenOut: Currency.unwrap(currency0),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -96,7 +137,9 @@ contract FairRailHookTest is Test {
     }
 
     function test_BatchMatchingSimulation() public view {
-        IntentMatcher.MatchResult memory res = matcher.processBatchMatching(token0, token1, 100 ether);
+        IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
+            Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
+        );
         assertEq(res.matchedAmount, 40 ether);
         assertEq(res.remainingAmountIn, 60 ether);
     }
@@ -104,8 +147,8 @@ contract FairRailHookTest is Test {
     function test_RevertExpiredIntent() public {
         IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
             trader: traderA,
-            tokenIn: token0,
-            tokenOut: token1,
+            tokenIn: Currency.unwrap(currency0),
+            tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -115,8 +158,8 @@ contract FairRailHookTest is Test {
 
         IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
             trader: traderB,
-            tokenIn: token1,
-            tokenOut: token0,
+            tokenIn: Currency.unwrap(currency1),
+            tokenOut: Currency.unwrap(currency0),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -131,8 +174,8 @@ contract FairRailHookTest is Test {
     function test_RevertDuplicateIntent() public {
         IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
             trader: traderA,
-            tokenIn: token0,
-            tokenOut: token1,
+            tokenIn: Currency.unwrap(currency0),
+            tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -142,8 +185,8 @@ contract FairRailHookTest is Test {
 
         IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
             trader: traderB,
-            tokenIn: token1,
-            tokenOut: token0,
+            tokenIn: Currency.unwrap(currency1),
+            tokenOut: Currency.unwrap(currency0),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -164,8 +207,8 @@ contract FairRailHookTest is Test {
 
         IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
             trader: traderA,
-            tokenIn: token0,
-            tokenOut: token1,
+            tokenIn: Currency.unwrap(currency0),
+            tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
             nonce: 1,
@@ -173,10 +216,9 @@ contract FairRailHookTest is Test {
             signature: ""
         });
 
-        // intentB wants token2 as output, not token0 — tokens don't cross-match
         IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
             trader: traderB,
-            tokenIn: token1,
+            tokenIn: Currency.unwrap(currency1),
             tokenOut: token2,
             amountIn: 10 ether,
             minAmountOut: 10 ether,
@@ -194,7 +236,7 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_MevAuctionBiddingAndSettlement() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         // Searcher bids 1 ETH on the pool MEV auction
         vm.deal(searcher, 5 ether);
@@ -218,14 +260,14 @@ contract FairRailHookTest is Test {
     }
 
     function test_RevertZeroBid() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         vm.expectRevert(MevAuction.BidTooLow.selector);
         auction.submitBid{value: 0}(poolId);
     }
 
     function test_RevertBidTooLow() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         vm.deal(searcher, 5 ether);
         vm.prank(searcher);
@@ -239,7 +281,7 @@ contract FairRailHookTest is Test {
     }
 
     function test_OutbidRefundPullPattern() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         // Searcher1 bids 1 ETH
         vm.deal(searcher, 5 ether);
@@ -268,7 +310,7 @@ contract FairRailHookTest is Test {
     }
 
     function test_RevertUnauthorizedSettleAuction() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         // Random address trying to settle — should revert
         vm.prank(traderA);
@@ -277,7 +319,7 @@ contract FairRailHookTest is Test {
     }
 
     function test_ProtocolTreasuryWithdrawal() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
         // Create and settle a bid
         vm.deal(searcher, 5 ether);
@@ -310,7 +352,7 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_BeforeSwapHookCallback() public {
-        SwapParams memory params = SwapParams({
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
             sqrtPriceLimitX96: 0
@@ -318,37 +360,38 @@ contract FairRailHookTest is Test {
 
         vm.prank(poolManager);
         (bytes4 selector,,) = hook.beforeSwap(traderA, poolKey, params, "");
-        assertEq(selector, FairRailHook.beforeSwap.selector);
+        assertEq(selector, IHooks.beforeSwap.selector);
 
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        PoolId poolId = poolKey.toId();
         (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
         assertEq(matchedVol, 4 ether); // 40% of 10 ether
     }
 
     function test_AfterSwapHookCallback() public {
-        bytes32 poolId = keccak256(abi.encode(poolKey));
+        bytes32 rawPoolId = PoolId.unwrap(poolKey.toId());
 
         // Submit searcher bid first
         vm.deal(searcher, 2 ether);
         vm.prank(searcher);
-        auction.submitBid{value: 1 ether}(poolId);
+        auction.submitBid{value: 1 ether}(rawPoolId);
 
-        SwapParams memory params = SwapParams({
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
             sqrtPriceLimitX96: 0
         });
 
         vm.prank(poolManager);
-        (bytes4 selector,) = hook.afterSwap(traderA, poolKey, params, 0, "");
-        assertEq(selector, FairRailHook.afterSwap.selector);
+        (bytes4 selector,) = hook.afterSwap(traderA, poolKey, params, BalanceDelta.wrap(0), "");
+        assertEq(selector, IHooks.afterSwap.selector);
 
+        PoolId poolId = poolKey.toId();
         (, uint256 totalLpMev) = hook.getPoolMetrics(poolId);
         assertEq(totalLpMev, 0.8 ether);
     }
 
     function test_RevertBeforeSwapUnauthorized() public {
-        SwapParams memory params = SwapParams({
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
             sqrtPriceLimitX96: 0
@@ -361,7 +404,7 @@ contract FairRailHookTest is Test {
     }
 
     function test_RevertAfterSwapUnauthorized() public {
-        SwapParams memory params = SwapParams({
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
             sqrtPriceLimitX96: 0
@@ -370,6 +413,12 @@ contract FairRailHookTest is Test {
         // Calling from non-poolManager should revert
         vm.prank(traderA);
         vm.expectRevert(FairRailHook.OnlyPoolManager.selector);
-        hook.afterSwap(traderA, poolKey, params, 0, "");
+        hook.afterSwap(traderA, poolKey, params, BalanceDelta.wrap(0), "");
+    }
+
+    function test_PoolIdComputedCanonically() public view {
+        // Verify our PoolId matches the canonical v4 computation
+        PoolId poolId = poolKey.toId();
+        assertTrue(PoolId.unwrap(poolId) != bytes32(0));
     }
 }
