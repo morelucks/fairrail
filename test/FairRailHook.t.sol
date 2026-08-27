@@ -25,8 +25,13 @@ contract FairRailHookTest is Test {
     MevAuction public auction;
 
     address public poolManager = address(0x1111111111111111111111111111111111111111);
-    address public traderA = address(0xAAAA);
-    address public traderB = address(0xBBBB);
+
+    // Use private keys so we can sign intents with vm.sign()
+    uint256 public traderAKey = 0xA11CE;
+    uint256 public traderBKey = 0xB0B;
+    address public traderA;
+    address public traderB;
+
     address public searcher = address(0xCCCC);
     address public searcher2 = address(0xDDDD);
 
@@ -36,14 +41,15 @@ contract FairRailHookTest is Test {
     PoolKey public poolKey;
 
     function setUp() public {
+        // Derive trader addresses from private keys
+        traderA = vm.addr(traderAKey);
+        traderB = vm.addr(traderBKey);
+
         matcher = new IntentMatcher();
 
         // FairRailHook requires beforeSwap (1<<7 = 0x80) and afterSwap (1<<6 = 0x40) flags
-        // encoded in the hook address. Compute a valid address: low 14 bits = 0x00C0
         uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
 
-        // Deploy hook to a deterministic address encoding the correct permission flags.
-        // We use deployCodeTo to place the contract at the flag-valid address.
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
         hook = FairRailHook(address(flags));
@@ -59,6 +65,44 @@ contract FairRailHookTest is Test {
             tickSpacing: 60,
             hooks: IHooks(address(hook))
         });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  EIP-712 Signing Helpers
+    // ──────────────────────────────────────────────────────
+
+    /// @dev Signs a TradeIntent with the given private key using EIP-712
+    function _signIntent(
+        IntentMatcher.TradeIntent memory intent,
+        uint256 privateKey
+    ) internal view returns (bytes memory) {
+        bytes32 digest = matcher.getDigest(intent);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    /// @dev Creates a signed TradeIntent for convenience
+    function _makeSignedIntent(
+        uint256 privateKey,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (IntentMatcher.TradeIntent memory intent) {
+        address trader = vm.addr(privateKey);
+        intent = IntentMatcher.TradeIntent({
+            trader: trader,
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: amountIn,
+            minAmountOut: minAmountOut,
+            nonce: nonce,
+            deadline: deadline,
+            signature: "" // placeholder
+        });
+        intent.signature = _signIntent(intent, privateKey);
     }
 
     // ──────────────────────────────────────────────────────
@@ -82,58 +126,120 @@ contract FairRailHookTest is Test {
     }
 
     function test_HookImplementsIHooks() public view {
-        // Verify the hook address encodes the correct flags
         assertTrue(IHooks(address(hook)).hasPermission(Hooks.BEFORE_SWAP_FLAG));
         assertTrue(IHooks(address(hook)).hasPermission(Hooks.AFTER_SWAP_FLAG));
         assertFalse(IHooks(address(hook)).hasPermission(Hooks.BEFORE_INITIALIZE_FLAG));
     }
 
     // ──────────────────────────────────────────────────────
-    //  IntentMatcher Tests
+    //  EIP-712 Domain & Hashing Tests
     // ──────────────────────────────────────────────────────
 
+    function test_DomainSeparator() public view {
+        bytes32 ds = matcher.DOMAIN_SEPARATOR();
+        assertTrue(ds != bytes32(0));
+    }
+
+    function test_TradeIntentTypehash() public view {
+        bytes32 expected = keccak256(
+            "TradeIntent(address trader,address tokenIn,address tokenOut,uint256 amountIn,uint256 minAmountOut,uint256 nonce,uint256 deadline)"
+        );
+        assertEq(matcher.TRADE_INTENT_TYPEHASH(), expected);
+    }
+
     function test_IntentSchemaHash() public view {
+        IntentMatcher.TradeIntent memory intent = _makeSignedIntent(
+            traderAKey,
+            Currency.unwrap(currency0),
+            Currency.unwrap(currency1),
+            10 ether,
+            9.9 ether,
+            0,
+            block.timestamp + 100
+        );
+
+        bytes32 hash = matcher.getSchemaHash(intent);
+        assertTrue(hash != bytes32(0));
+    }
+
+    function test_DigestDeterministic() public view {
         IntentMatcher.TradeIntent memory intent = IntentMatcher.TradeIntent({
             trader: traderA,
             tokenIn: Currency.unwrap(currency0),
             tokenOut: Currency.unwrap(currency1),
             amountIn: 10 ether,
             minAmountOut: 9.9 ether,
-            nonce: 1,
+            nonce: 0,
             deadline: block.timestamp + 100,
             signature: ""
         });
 
-        bytes32 hash = matcher.getSchemaHash(intent);
-        assertTrue(hash != bytes32(0));
+        bytes32 digest1 = matcher.getDigest(intent);
+        bytes32 digest2 = matcher.getDigest(intent);
+        assertEq(digest1, digest2);
+        assertTrue(digest1 != bytes32(0));
     }
 
-    function test_DirectIntentMatching() public {
-        IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
-            trader: traderA,
-            tokenIn: Currency.unwrap(currency0),
-            tokenOut: Currency.unwrap(currency1),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+    // ──────────────────────────────────────────────────────
+    //  IntentMatcher — Signed Matching Tests
+    // ──────────────────────────────────────────────────────
 
-        IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
-            trader: traderB,
-            tokenIn: Currency.unwrap(currency1),
-            tokenOut: Currency.unwrap(currency0),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+    function test_DirectIntentMatchingWithSignatures() public {
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey,
+            Currency.unwrap(currency0),
+            Currency.unwrap(currency1),
+            10 ether,
+            10 ether,
+            0, // nonce 0
+            block.timestamp + 100
+        );
+
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            10 ether,
+            10 ether,
+            0, // nonce 0
+            block.timestamp + 100
+        );
 
         (uint256 matchedA, uint256 matchedB) = matcher.matchDirectIntents(intentA, intentB);
         assertEq(matchedA, 10 ether);
         assertEq(matchedB, 10 ether);
+
+        // Nonces should have incremented
+        assertEq(matcher.userNonces(traderA), 1);
+        assertEq(matcher.userNonces(traderB), 1);
+    }
+
+    function test_NonceIncrements() public {
+        // First match at nonce 0
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            5 ether, 5 ether, 0, block.timestamp + 100
+        );
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            5 ether, 5 ether, 0, block.timestamp + 100
+        );
+        matcher.matchDirectIntents(intentA, intentB);
+        assertEq(matcher.userNonces(traderA), 1);
+        assertEq(matcher.userNonces(traderB), 1);
+
+        // Second match at nonce 1
+        IntentMatcher.TradeIntent memory intentA2 = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            7 ether, 7 ether, 1, block.timestamp + 100
+        );
+        IntentMatcher.TradeIntent memory intentB2 = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            7 ether, 7 ether, 1, block.timestamp + 100
+        );
+        matcher.matchDirectIntents(intentA2, intentB2);
+        assertEq(matcher.userNonces(traderA), 2);
+        assertEq(matcher.userNonces(traderB), 2);
     }
 
     function test_BatchMatchingSimulation() public view {
@@ -144,88 +250,118 @@ contract FairRailHookTest is Test {
         assertEq(res.remainingAmountIn, 60 ether);
     }
 
-    function test_RevertExpiredIntent() public {
-        IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
-            trader: traderA,
-            tokenIn: Currency.unwrap(currency0),
-            tokenOut: Currency.unwrap(currency1),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp - 1, // already expired
-            signature: ""
-        });
+    // ──────────────────────────────────────────────────────
+    //  IntentMatcher — Revert Tests
+    // ──────────────────────────────────────────────────────
 
+    function test_RevertInvalidSignature() public {
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+
+        // Create intentB but sign with traderA's key (wrong signer)
         IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
             trader: traderB,
             tokenIn: Currency.unwrap(currency1),
             tokenOut: Currency.unwrap(currency0),
             amountIn: 10 ether,
             minAmountOut: 10 ether,
-            nonce: 1,
+            nonce: 0,
             deadline: block.timestamp + 100,
             signature: ""
         });
+        // Sign with traderA's key instead of traderB's key
+        intentB.signature = _signIntent(intentB, traderAKey);
+
+        vm.expectRevert(IntentMatcher.InvalidSignature.selector);
+        matcher.matchDirectIntents(intentA, intentB);
+    }
+
+    function test_RevertEmptySignature() public {
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+
+        // intentB has empty signature
+        IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
+            trader: traderB,
+            tokenIn: Currency.unwrap(currency1),
+            tokenOut: Currency.unwrap(currency0),
+            amountIn: 10 ether,
+            minAmountOut: 10 ether,
+            nonce: 0,
+            deadline: block.timestamp + 100,
+            signature: "" // empty!
+        });
+
+        vm.expectRevert(IntentMatcher.InvalidSignature.selector);
+        matcher.matchDirectIntents(intentA, intentB);
+    }
+
+    function test_RevertInvalidNonce() public {
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+
+        // intentB uses nonce 5 but expected nonce is 0
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 5, block.timestamp + 100
+        );
+
+        vm.expectRevert(IntentMatcher.InvalidNonce.selector);
+        matcher.matchDirectIntents(intentA, intentB);
+    }
+
+    function test_RevertExpiredIntent() public {
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp - 1 // expired
+        );
+
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
 
         vm.expectRevert(IntentMatcher.IntentExpired.selector);
         matcher.matchDirectIntents(intentA, intentB);
     }
 
     function test_RevertDuplicateIntent() public {
-        IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
-            trader: traderA,
-            tokenIn: Currency.unwrap(currency0),
-            tokenOut: Currency.unwrap(currency1),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
 
-        IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
-            trader: traderB,
-            tokenIn: Currency.unwrap(currency1),
-            tokenOut: Currency.unwrap(currency0),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
 
-        // First match should succeed
+        // First match succeeds
         matcher.matchDirectIntents(intentA, intentB);
 
-        // Second attempt with same intents should revert
-        vm.expectRevert(IntentMatcher.IntentAlreadyExecuted.selector);
+        // Second attempt — nonce is now 1 but intent was signed with nonce 0
+        vm.expectRevert(IntentMatcher.InvalidNonce.selector);
         matcher.matchDirectIntents(intentA, intentB);
     }
 
     function test_RevertIncompatibleTokens() public {
         address token2 = address(0x3000);
 
-        IntentMatcher.TradeIntent memory intentA = IntentMatcher.TradeIntent({
-            trader: traderA,
-            tokenIn: Currency.unwrap(currency0),
-            tokenOut: Currency.unwrap(currency1),
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
 
-        IntentMatcher.TradeIntent memory intentB = IntentMatcher.TradeIntent({
-            trader: traderB,
-            tokenIn: Currency.unwrap(currency1),
-            tokenOut: token2,
-            amountIn: 10 ether,
-            minAmountOut: 10 ether,
-            nonce: 1,
-            deadline: block.timestamp + 100,
-            signature: ""
-        });
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), token2,
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
 
         vm.expectRevert(IntentMatcher.IncompatibleTokens.selector);
         matcher.matchDirectIntents(intentA, intentB);
@@ -238,7 +374,6 @@ contract FairRailHookTest is Test {
     function test_MevAuctionBiddingAndSettlement() public {
         bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
-        // Searcher bids 1 ETH on the pool MEV auction
         vm.deal(searcher, 5 ether);
         vm.prank(searcher);
         auction.submitBid{value: 1 ether}(poolId);
@@ -247,15 +382,11 @@ contract FairRailHookTest is Test {
         assertEq(highestSearcher, searcher);
         assertEq(bidAmount, 1 ether);
 
-        // Prank as hook to settle auction
         vm.prank(address(hook));
         uint256 lpRevenue = auction.settleAuction(poolId);
 
-        // 80% of 1 ETH = 0.8 ETH allocated to LPs
         assertEq(lpRevenue, 0.8 ether);
         assertEq(auction.getAccruedLpRevenue(poolId), 0.8 ether);
-
-        // 20% = 0.2 ETH goes to protocol treasury
         assertEq(auction.protocolTreasury(), 0.2 ether);
     }
 
@@ -273,7 +404,6 @@ contract FairRailHookTest is Test {
         vm.prank(searcher);
         auction.submitBid{value: 2 ether}(poolId);
 
-        // Searcher2 bids lower in the same block — should revert
         vm.deal(searcher2, 5 ether);
         vm.prank(searcher2);
         vm.expectRevert(MevAuction.BidTooLow.selector);
@@ -283,19 +413,16 @@ contract FairRailHookTest is Test {
     function test_OutbidRefundPullPattern() public {
         bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
-        // Searcher1 bids 1 ETH
         vm.deal(searcher, 5 ether);
         vm.prank(searcher);
         auction.submitBid{value: 1 ether}(poolId);
 
-        // Searcher2 outbids with 2 ETH — searcher1 gets refund credit
         vm.deal(searcher2, 5 ether);
         vm.prank(searcher2);
         auction.submitBid{value: 2 ether}(poolId);
 
         assertEq(auction.pendingRefunds(searcher), 1 ether);
 
-        // Searcher1 withdraws refund
         uint256 balanceBefore = searcher.balance;
         vm.prank(searcher);
         auction.withdrawRefund();
@@ -312,7 +439,6 @@ contract FairRailHookTest is Test {
     function test_RevertUnauthorizedSettleAuction() public {
         bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
-        // Random address trying to settle — should revert
         vm.prank(traderA);
         vm.expectRevert(MevAuction.Unauthorized.selector);
         auction.settleAuction(poolId);
@@ -321,7 +447,6 @@ contract FairRailHookTest is Test {
     function test_ProtocolTreasuryWithdrawal() public {
         bytes32 poolId = PoolId.unwrap(poolKey.toId());
 
-        // Create and settle a bid
         vm.deal(searcher, 5 ether);
         vm.prank(searcher);
         auction.submitBid{value: 1 ether}(poolId);
@@ -329,10 +454,8 @@ contract FairRailHookTest is Test {
         vm.prank(address(hook));
         auction.settleAuction(poolId);
 
-        // Protocol treasury should have 0.2 ETH
         assertEq(auction.protocolTreasury(), 0.2 ether);
 
-        // Withdraw treasury via hook
         address treasury = address(0x9999);
         vm.prank(address(hook));
         auction.withdrawProtocolTreasury(treasury);
@@ -370,7 +493,6 @@ contract FairRailHookTest is Test {
     function test_AfterSwapHookCallback() public {
         bytes32 rawPoolId = PoolId.unwrap(poolKey.toId());
 
-        // Submit searcher bid first
         vm.deal(searcher, 2 ether);
         vm.prank(searcher);
         auction.submitBid{value: 1 ether}(rawPoolId);
@@ -397,7 +519,6 @@ contract FairRailHookTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        // Calling from non-poolManager should revert
         vm.prank(traderA);
         vm.expectRevert(FairRailHook.OnlyPoolManager.selector);
         hook.beforeSwap(traderA, poolKey, params, "");
@@ -410,14 +531,12 @@ contract FairRailHookTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        // Calling from non-poolManager should revert
         vm.prank(traderA);
         vm.expectRevert(FairRailHook.OnlyPoolManager.selector);
         hook.afterSwap(traderA, poolKey, params, BalanceDelta.wrap(0), "");
     }
 
     function test_PoolIdComputedCanonically() public view {
-        // Verify our PoolId matches the canonical v4 computation
         PoolId poolId = poolKey.toId();
         assertTrue(PoolId.unwrap(poolId) != bytes32(0));
     }
