@@ -17,6 +17,8 @@ contract MevAuction {
     address public immutable hook;
     mapping(bytes32 => Bid) public highestBids;
     mapping(bytes32 => uint256) public totalLpRevenuePool;
+    mapping(address => uint256) public pendingRefunds;
+    uint256 public protocolTreasury;
 
     event BidSubmitted(
         bytes32 indexed poolId,
@@ -34,6 +36,8 @@ contract MevAuction {
     error Unauthorized();
     error BidTooLow();
     error AuctionExpired();
+    error WithdrawFailed();
+    error NothingToWithdraw();
 
     modifier onlyHook() {
         if (msg.sender != hook) revert Unauthorized();
@@ -56,9 +60,9 @@ contract MevAuction {
             revert BidTooLow();
         }
 
-        // Refund previous bidder if same block
+        // Credit refund to previous bidder if same block (pull-based pattern)
         if (currentBid.blockNumber == block.number && currentBid.amount > 0) {
-            payable(currentBid.searcher).transfer(currentBid.amount);
+            pendingRefunds[currentBid.searcher] += currentBid.amount;
         }
 
         highestBids[poolId] = Bid({
@@ -80,11 +84,35 @@ contract MevAuction {
         if (winningBid.amount > 0 && winningBid.blockNumber == block.number) {
             // Allocate 80% directly to LP pool revenue, 20% to hook protocol treasury/incentives
             lpRevenue = (winningBid.amount * 80) / 100;
+            uint256 protocolShare = winningBid.amount - lpRevenue;
             totalLpRevenuePool[poolId] += lpRevenue;
+            protocolTreasury += protocolShare;
 
             delete highestBids[poolId];
             emit AuctionSettled(poolId, winningBid.searcher, lpRevenue);
         }
+    }
+
+    /**
+     * @notice Allows outbid searchers to withdraw their refunded bids (pull pattern)
+     */
+    function withdrawRefund() external {
+        uint256 amount = pendingRefunds[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+        pendingRefunds[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert WithdrawFailed();
+    }
+
+    /**
+     * @notice Allows the hook contract to withdraw accumulated protocol treasury
+     */
+    function withdrawProtocolTreasury(address to) external onlyHook {
+        uint256 amount = protocolTreasury;
+        if (amount == 0) revert NothingToWithdraw();
+        protocolTreasury = 0;
+        (bool success, ) = payable(to).call{value: amount}("");
+        if (!success) revert WithdrawFailed();
     }
 
     /**

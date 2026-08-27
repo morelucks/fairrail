@@ -24,7 +24,7 @@ contract IntentMatcher {
         uint256 filledAmountOut;
     }
 
-    mapping(address => uint256) public userNonces;
+    // NOTE: Signature verification & nonce tracking are planned for Phase 2 (FHE Integration).
     mapping(bytes32 => bool) public executedIntents;
 
     event IntentMatched(
@@ -101,13 +101,15 @@ contract IntentMatcher {
 
     /**
      * @notice Evaluates if incoming swap input can be partially or fully offset by pending batch intents
+     * @dev HACKATHON DEMO: This is a simulation stub that always matches 40% of volume.
+     *      In production, this would query an actual pending intent queue and compute real overlaps.
      */
     function processBatchMatching(
         address tokenIn,
         address tokenOut,
         uint256 incomingAmount
     ) external pure returns (MatchResult memory result) {
-        // Mock matching ratio logic (e.g. matching up to 40% of trade off-chain in demo simulation)
+        // Simulated matching ratio — always matches 40% of incoming trade off-chain
         uint256 simulatedMatch = (incomingAmount * 40) / 100;
         result.matchedAmount = simulatedMatch;
         result.remainingAmountIn = incomingAmount - simulatedMatch;

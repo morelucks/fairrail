@@ -47,7 +47,7 @@ struct PoolKey {
 contract FairRailHook {
     address public immutable poolManager;
     IntentMatcher public immutable intentMatcher;
-    MevAuction public mevAuction;
+    MevAuction public immutable mevAuction;
 
     mapping(bytes32 => uint256) public totalMatchedVolume;
     mapping(bytes32 => uint256) public totalMevRecapturedForLPs;
@@ -99,7 +99,7 @@ contract FairRailHook {
         PoolKey calldata key,
         SwapParams calldata params,
         bytes calldata hookData
-    ) external returns (bytes4 selector, int256 beforeSwapDelta, uint24 lpFeeOverride) {
+    ) external onlyPoolManager returns (bytes4 selector, int256 beforeSwapDelta, uint24 lpFeeOverride) {
         bytes32 poolId = keccak256(abi.encode(key));
         
         uint256 amountIn = params.amountSpecified < 0 ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
@@ -129,7 +129,7 @@ contract FairRailHook {
         SwapParams calldata params,
         int256 balanceDelta,
         bytes calldata hookData
-    ) external returns (bytes4 selector, int256 hookDelta) {
+    ) external onlyPoolManager returns (bytes4 selector, int256 hookDelta) {
         bytes32 poolId = keccak256(abi.encode(key));
 
         // Settle searcher MEV auction for this pool block
