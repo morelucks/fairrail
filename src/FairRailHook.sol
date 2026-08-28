@@ -7,7 +7,7 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/types/PoolId.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapDelta.sol";
+import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 
 import "./IntentMatcher.sol";
@@ -66,7 +66,7 @@ contract FairRailHook is IHooks {
             afterSwap: true,
             beforeDonate: false,
             afterDonate: false,
-            beforeSwapReturnDelta: false,
+            beforeSwapReturnDelta: true,
             afterSwapReturnDelta: false,
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false
@@ -106,12 +106,20 @@ contract FairRailHook is IHooks {
 
         IntentMatcher.MatchResult memory matchResult = intentMatcher.processBatchMatching(tokenIn, tokenOut, amountIn);
 
+        BeforeSwapDelta delta = BeforeSwapDeltaLibrary.ZERO_DELTA;
+
         if (matchResult.matchedAmount > 0) {
             totalMatchedVolume[poolId] += matchResult.matchedAmount;
             emit PrivateIntentMatched(poolId, matchResult.matchedAmount, matchResult.remainingAmountIn);
+
+            // Return a delta that reduces the AMM swap by the matched amount.
+            // deltaSpecified is positive = hook has already handled this portion of the specified token,
+            // so the PoolManager will reduce the swap amount accordingly.
+            int128 deltaSpecified = int128(int256(matchResult.matchedAmount));
+            delta = toBeforeSwapDelta(deltaSpecified, 0);
         }
 
-        return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+        return (IHooks.beforeSwap.selector, delta, 0);
     }
 
     /**

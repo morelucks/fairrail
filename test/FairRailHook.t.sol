@@ -78,8 +78,8 @@ contract FairRailHookTest is Test {
         vm.prank(traderB);
         token1.approve(address(matcher), type(uint256).max);
 
-        // FairRailHook requires beforeSwap (1<<7 = 0x80) and afterSwap (1<<6 = 0x40) flags
-        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
+        // FairRailHook requires beforeSwap, afterSwap, and beforeSwapReturnDelta flags
+        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG);
 
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
@@ -149,7 +149,7 @@ contract FairRailHookTest is Test {
         assertFalse(flags.afterRemoveLiquidity);
         assertFalse(flags.beforeDonate);
         assertFalse(flags.afterDonate);
-        assertFalse(flags.beforeSwapReturnDelta);
+        assertTrue(flags.beforeSwapReturnDelta);
         assertFalse(flags.afterSwapReturnDelta);
     }
 
