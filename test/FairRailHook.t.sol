@@ -279,12 +279,35 @@ contract FairRailHookTest is Test {
         assertEq(matcher.userNonces(traderB), 2);
     }
 
-    function test_BatchMatchingSimulation() public view {
+    function test_BatchMatchingSimulation() public {
+        // Submit a counter-intent from traderB: wants to sell token1 and buy token0
+        IntentMatcher.TradeIntent memory counterIntent = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            40 ether,
+            40 ether,
+            0,
+            block.timestamp + 100
+        );
+        matcher.submitPendingIntent(counterIntent);
+
+        // processBatchMatching looks for counter-intents that sell currency1 and buy currency0
         IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
             Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
         );
+        // The counter-intent has 40 ether available, so 40 ether is matched
         assertEq(res.matchedAmount, 40 ether);
         assertEq(res.remainingAmountIn, 60 ether);
+    }
+
+    function test_BatchMatchingNoCounterIntents() public {
+        // With an empty queue, nothing should match
+        IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
+            Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
+        );
+        assertEq(res.matchedAmount, 0);
+        assertEq(res.remainingAmountIn, 100 ether);
     }
 
     // ──────────────────────────────────────────────────────
@@ -512,6 +535,18 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_BeforeSwapHookCallback() public {
+        // Submit a counter-intent so beforeSwap has something to match against
+        IntentMatcher.TradeIntent memory counterIntent = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            4 ether,
+            4 ether,
+            0,
+            block.timestamp + 100
+        );
+        matcher.submitPendingIntent(counterIntent);
+
         IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
@@ -524,7 +559,24 @@ contract FairRailHookTest is Test {
 
         PoolId poolId = poolKey.toId();
         (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
-        assertEq(matchedVol, 4 ether); // 40% of 10 ether
+        assertEq(matchedVol, 4 ether); // 4 ether counter-intent matched from 10 ether swap
+    }
+
+    function test_BeforeSwapNoMatch() public {
+        // No pending intents — nothing should match
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        vm.prank(poolManager);
+        (bytes4 selector,,) = hook.beforeSwap(traderA, poolKey, params, "");
+        assertEq(selector, IHooks.beforeSwap.selector);
+
+        PoolId poolId = poolKey.toId();
+        (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
+        assertEq(matchedVol, 0);
     }
 
     function test_AfterSwapHookCallback() public {
