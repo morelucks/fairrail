@@ -17,9 +17,6 @@ import {FairRailHook} from "../src/FairRailHook.sol";
  *   Optionally set POOL_MANAGER=0x... to override the default PoolManager address.
  */
 contract DeployFairRail is Script {
-    // Deterministic CREATE2 deployer proxy (available on all major EVM chains)
-    address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
-
     // Maximum iterations for salt mining to prevent infinite loops
     uint256 constant MAX_LOOP = 200_000;
 
@@ -27,6 +24,9 @@ contract DeployFairRail is Script {
         // PRIVATE_KEY must be set via environment variable — script will revert if missing
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address poolManager = vm.envOr("POOL_MANAGER", address(0x000000000004444c5dc75cB358380D2e3dE08A90));
+
+        // The CREATE2 deployer for `new Contract{salt}()` is the broadcast address (msg.sender)
+        address deployer = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -42,7 +42,8 @@ contract DeployFairRail is Script {
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         bytes memory creationCode = abi.encodePacked(type(FairRailHook).creationCode, constructorArgs);
 
-        (address hookAddress, bytes32 salt) = _mineSalt(CREATE2_DEPLOYER, hookFlags, creationCode);
+        // Use deployer (broadcast address) since Solidity's `new {salt}` uses msg.sender as CREATE2 deployer
+        (address hookAddress, bytes32 salt) = _mineSalt(deployer, hookFlags, creationCode);
         console.log("Mined hook address:", hookAddress);
         console.log("Using salt:");
         console.logBytes32(salt);

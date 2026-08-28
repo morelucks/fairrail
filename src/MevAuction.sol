@@ -20,6 +20,9 @@ contract MevAuction {
     mapping(address => uint256) public pendingRefunds;
     uint256 public protocolTreasury;
 
+    uint256 private _locked = 1;
+
+
     event BidSubmitted(
         bytes32 indexed poolId,
         address indexed searcher,
@@ -38,10 +41,18 @@ contract MevAuction {
     error AuctionExpired();
     error WithdrawFailed();
     error NothingToWithdraw();
+    error Reentrancy();
 
     modifier onlyHook() {
         if (msg.sender != hook) revert Unauthorized();
         _;
+    }
+
+    modifier nonReentrant() {
+        if (_locked != 1) revert Reentrancy();
+        _locked = 2;
+        _;
+        _locked = 1;
     }
 
     constructor(address _hook) {
@@ -96,7 +107,7 @@ contract MevAuction {
     /**
      * @notice Allows outbid searchers to withdraw their refunded bids (pull pattern)
      */
-    function withdrawRefund() external {
+    function withdrawRefund() external nonReentrant {
         uint256 amount = pendingRefunds[msg.sender];
         if (amount == 0) revert NothingToWithdraw();
         pendingRefunds[msg.sender] = 0;
@@ -107,7 +118,7 @@ contract MevAuction {
     /**
      * @notice Allows the hook contract to withdraw accumulated protocol treasury
      */
-    function withdrawProtocolTreasury(address to) external onlyHook {
+    function withdrawProtocolTreasury(address to) external onlyHook nonReentrant {
         uint256 amount = protocolTreasury;
         if (amount == 0) revert NothingToWithdraw();
         protocolTreasury = 0;
@@ -124,7 +135,7 @@ contract MevAuction {
      * @param to Address to receive the LP revenue (e.g., LP reward distributor, multisig, or donation contract)
      * @return amount The amount of ETH withdrawn
      */
-    function withdrawLpRevenue(bytes32 poolId, address to) external onlyHook returns (uint256 amount) {
+    function withdrawLpRevenue(bytes32 poolId, address to) external onlyHook nonReentrant returns (uint256 amount) {
         amount = totalLpRevenuePool[poolId];
         if (amount == 0) revert NothingToWithdraw();
         totalLpRevenuePool[poolId] = 0;

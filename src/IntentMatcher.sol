@@ -62,12 +62,6 @@ contract IntentMatcher {
         uint256 outputAmount
     );
 
-    event BatchMatched(
-        bytes32 indexed batchId,
-        uint256 totalIntents,
-        uint256 totalVolumeMatched,
-        uint256 unmatchedVolumeRoutedToAMM
-    );
 
     // ──────────────────────────────────────────────────────
     //  Errors
@@ -269,6 +263,12 @@ contract IntentMatcher {
             v := byte(0, calldataload(add(sig.offset, 0x40)))
         }
 
+        // Reject signatures with `s` in the upper half of the secp256k1 curve to prevent malleability
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidSignature();
+        }
+
         address recovered = ecrecover(digest, v, r, s);
         if (recovered == address(0) || recovered != intent.trader) {
             revert InvalidSignature();
@@ -379,5 +379,34 @@ contract IntentMatcher {
         result.remainingAmountIn = remaining;
         result.filledAmountOut = totalFilled;
     }
-}
 
+    /**
+     * @notice Compacts the pending intent queue for a token pair by removing consumed and expired entries.
+     *         Callable by anyone to prevent unbounded gas growth from stale queue entries.
+     * @param tokenIn The input token of the pair to clean up
+     * @param tokenOut The output token of the pair to clean up
+     * @return removed The number of entries removed
+     */
+    function cleanupPendingIntents(address tokenIn, address tokenOut) external returns (uint256 removed) {
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenIn, tokenOut));
+        TradeIntent[] storage intents = _pendingIntents[pairHash];
+
+        uint256 writeIdx = 0;
+        for (uint256 readIdx = 0; readIdx < intents.length; readIdx++) {
+            // Keep the intent if it still has volume and hasn't expired
+            if (intents[readIdx].amountIn > 0 && block.timestamp <= intents[readIdx].deadline) {
+                if (writeIdx != readIdx) {
+                    intents[writeIdx] = intents[readIdx];
+                }
+                writeIdx++;
+            }
+        }
+
+        removed = intents.length - writeIdx;
+
+        // Pop removed entries from the end
+        for (uint256 i = 0; i < removed; i++) {
+            intents.pop();
+        }
+    }
+}
