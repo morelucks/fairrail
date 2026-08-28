@@ -269,6 +269,12 @@ contract IntentMatcher {
             v := byte(0, calldataload(add(sig.offset, 0x40)))
         }
 
+        // Reject signatures with `s` in the upper half of the secp256k1 curve to prevent malleability
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidSignature();
+        }
+
         address recovered = ecrecover(digest, v, r, s);
         if (recovered == address(0) || recovered != intent.trader) {
             revert InvalidSignature();
