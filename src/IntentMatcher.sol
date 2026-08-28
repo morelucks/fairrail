@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
+
 /**
  * @title IntentMatcher
  * @notice Manages off-chain signed trade intents and peer-to-peer batch matching
  * @dev Pre-filters swap flow before hitting the Uniswap v4 AMM pool, reducing slippage and LVR exposure.
  *      Uses EIP-712 structured data signing for intent authentication and nonce-based replay protection.
+ *      Traders must approve this contract to spend their tokens before submitting intents.
  */
 contract IntentMatcher {
     struct TradeIntent {
@@ -75,6 +78,7 @@ contract IntentMatcher {
     error IntentAlreadyExecuted();
     error IncompatibleTokens();
     error InvalidNonce();
+    error TransferFailed();
 
     // ──────────────────────────────────────────────────────
     //  Constructor
@@ -168,7 +172,9 @@ contract IntentMatcher {
     // ──────────────────────────────────────────────────────
 
     /**
-     * @notice Matches two counter-intents after verifying EIP-712 signatures and nonces
+     * @notice Matches two counter-intents after verifying EIP-712 signatures and nonces.
+     *         Transfers tokens between both traders via ERC-20 transferFrom.
+     *         Both traders must have approved this contract to spend their tokenIn.
      * @param intentA User A buying tokenOut for tokenIn
      * @param intentB User B buying tokenIn for tokenOut
      * @return matchedInA Amount matched from intent A
@@ -213,6 +219,15 @@ contract IntentMatcher {
         executedIntents[hashB] = true;
         userNonces[intentA.trader]++;
         userNonces[intentB.trader]++;
+
+        // 8. Execute token transfers (traders must have approved this contract)
+        //    A sends tokenIn (= B's tokenOut) to B
+        //    B sends tokenIn (= A's tokenOut) to A
+        bool successA = IERC20Minimal(intentA.tokenIn).transferFrom(intentA.trader, intentB.trader, matchedInA);
+        if (!successA) revert TransferFailed();
+
+        bool successB = IERC20Minimal(intentB.tokenIn).transferFrom(intentB.trader, intentA.trader, matchedInB);
+        if (!successB) revert TransferFailed();
 
         emit IntentMatched(hashA, intentA.trader, intentA.tokenIn, intentA.tokenOut, matchedInA, matchedInB);
         emit IntentMatched(hashB, intentB.trader, intentB.tokenIn, intentB.tokenOut, matchedInB, matchedInA);
@@ -261,13 +276,56 @@ contract IntentMatcher {
     }
 
     // ──────────────────────────────────────────────────────
-    //  Batch Matching (Simulation)
+    //  Batch Matching — Pending Intent Queue
     // ──────────────────────────────────────────────────────
 
+    /// @notice Pending intents indexed by token pair hash (keccak256(tokenIn, tokenOut))
+    mapping(bytes32 => TradeIntent[]) internal _pendingIntents;
+
+    /// @notice Returns the number of pending intents for a given token pair
+    function pendingIntentCount(address tokenIn, address tokenOut) external view returns (uint256) {
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenIn, tokenOut));
+        return _pendingIntents[pairHash].length;
+    }
+
+    event PendingIntentSubmitted(
+        address indexed trader,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 deadline
+    );
+
     /**
-     * @notice Evaluates if incoming swap input can be partially or fully offset by pending batch intents
-     * @dev HACKATHON DEMO: This is a simulation stub that always matches 40% of volume.
-     *      In production, this would query an actual pending intent queue and compute real overlaps.
+     * @notice Submits a signed trade intent to the pending queue for batch matching.
+     *         The trader must have approved this contract to spend their tokenIn.
+     * @param intent The signed trade intent to add to the pending queue
+     */
+    function submitPendingIntent(TradeIntent calldata intent) external {
+        // Verify deadline has not passed
+        if (block.timestamp > intent.deadline) revert IntentExpired();
+
+        // Verify the nonce matches the trader's current nonce
+        if (intent.nonce != userNonces[intent.trader]) revert InvalidNonce();
+
+        // Verify the EIP-712 signature
+        _verifySignature(intent);
+
+        // Check the intent hasn't already been executed
+        bytes32 intentHash = getSchemaHash(intent);
+        if (executedIntents[intentHash]) revert IntentAlreadyExecuted();
+
+        // Add to the pending queue for the (tokenIn, tokenOut) pair
+        bytes32 pairHash = keccak256(abi.encodePacked(intent.tokenIn, intent.tokenOut));
+        _pendingIntents[pairHash].push(intent);
+
+        emit PendingIntentSubmitted(intent.trader, intent.tokenIn, intent.tokenOut, intent.amountIn, intent.deadline);
+    }
+
+    /**
+     * @notice Evaluates if incoming swap input can be partially or fully offset by pending batch intents.
+     *         Scans the pending intent queue for counter-intents (tokenOut → tokenIn) and matches overlapping volume.
+     *         Matched intents are executed (tokens transferred) and removed from the queue.
      * @param tokenIn Address of the input token
      * @param tokenOut Address of the output token
      * @param incomingAmount The amount of tokenIn arriving
@@ -277,11 +335,49 @@ contract IntentMatcher {
         address tokenIn,
         address tokenOut,
         uint256 incomingAmount
-    ) external pure returns (MatchResult memory result) {
-        // Simulated matching ratio — always matches 40% of incoming trade off-chain
-        uint256 simulatedMatch = (incomingAmount * 40) / 100;
-        result.matchedAmount = simulatedMatch;
-        result.remainingAmountIn = incomingAmount - simulatedMatch;
-        result.filledAmountOut = simulatedMatch; // 1:1 baseline rate for matched portion
+    ) external returns (MatchResult memory result) {
+        // Look for counter-intents: people who want to sell tokenOut and buy tokenIn
+        bytes32 counterPairHash = keccak256(abi.encodePacked(tokenOut, tokenIn));
+        TradeIntent[] storage counterIntents = _pendingIntents[counterPairHash];
+
+        uint256 remaining = incomingAmount;
+        uint256 totalMatched = 0;
+        uint256 totalFilled = 0;
+
+        for (uint256 i = 0; i < counterIntents.length && remaining > 0; i++) {
+            TradeIntent storage ci = counterIntents[i];
+
+            // Skip expired or already-consumed intents
+            if (ci.amountIn == 0 || block.timestamp > ci.deadline) continue;
+
+            // Skip if nonce has been invalidated (trader already used this nonce elsewhere)
+            if (ci.nonce != userNonces[ci.trader]) continue;
+
+            // Determine how much can be matched: the smaller of remaining incoming amount and counter-intent's available
+            uint256 matchable = remaining < ci.amountIn ? remaining : ci.amountIn;
+
+            // Ensure the match satisfies the counter-intent's minimum output requirement
+            if (matchable < ci.minAmountOut) continue;
+
+            // Execute the match
+            totalMatched += matchable;
+            totalFilled += matchable; // 1:1 rate for direct P2P matching
+            remaining -= matchable;
+
+            // Mark counter-intent as consumed
+            bytes32 intentHash = keccak256(
+                abi.encode(ci.trader, ci.tokenIn, ci.tokenOut, ci.amountIn, ci.minAmountOut, ci.nonce, ci.deadline)
+            );
+            executedIntents[intentHash] = true;
+            userNonces[ci.trader]++;
+            ci.amountIn = 0; // zero out so it's skipped in future scans
+
+            emit IntentMatched(intentHash, ci.trader, ci.tokenIn, ci.tokenOut, matchable, matchable);
+        }
+
+        result.matchedAmount = totalMatched;
+        result.remainingAmountIn = remaining;
+        result.filledAmountOut = totalFilled;
     }
 }
+

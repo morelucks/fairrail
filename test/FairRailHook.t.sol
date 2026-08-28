@@ -15,6 +15,7 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import "../src/IntentMatcher.sol";
 import "../src/MevAuction.sol";
 import "../src/FairRailHook.sol";
+import {TestERC20} from "v4-core/test/TestERC20.sol";
 
 contract FairRailHookTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -35,6 +36,8 @@ contract FairRailHookTest is Test {
     address public searcher = address(0xCCCC);
     address public searcher2 = address(0xDDDD);
 
+    TestERC20 public token0;
+    TestERC20 public token1;
     Currency public currency0;
     Currency public currency1;
 
@@ -47,16 +50,41 @@ contract FairRailHookTest is Test {
 
         matcher = new IntentMatcher();
 
-        // FairRailHook requires beforeSwap (1<<7 = 0x80) and afterSwap (1<<6 = 0x40) flags
-        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
+        // Deploy real ERC-20 tokens for intent matching tests
+        token0 = new TestERC20(0);
+        token1 = new TestERC20(0);
+
+        // Ensure token0 address < token1 address (Uniswap v4 canonical ordering)
+        if (address(token0) > address(token1)) {
+            (token0, token1) = (token1, token0);
+        }
+
+        currency0 = Currency.wrap(address(token0));
+        currency1 = Currency.wrap(address(token1));
+
+        // Mint tokens to traders
+        token0.mint(traderA, 1000 ether);
+        token1.mint(traderA, 1000 ether);
+        token0.mint(traderB, 1000 ether);
+        token1.mint(traderB, 1000 ether);
+
+        // Traders approve IntentMatcher to spend their tokens
+        vm.prank(traderA);
+        token0.approve(address(matcher), type(uint256).max);
+        vm.prank(traderA);
+        token1.approve(address(matcher), type(uint256).max);
+        vm.prank(traderB);
+        token0.approve(address(matcher), type(uint256).max);
+        vm.prank(traderB);
+        token1.approve(address(matcher), type(uint256).max);
+
+        // FairRailHook requires beforeSwap, afterSwap, and beforeSwapReturnDelta flags
+        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG);
 
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
-        hook = FairRailHook(address(flags));
+        hook = FairRailHook(payable(address(flags)));
         auction = hook.mevAuction();
-
-        currency0 = Currency.wrap(address(0x1000));
-        currency1 = Currency.wrap(address(0x2000));
 
         poolKey = PoolKey({
             currency0: currency0,
@@ -121,7 +149,7 @@ contract FairRailHookTest is Test {
         assertFalse(flags.afterRemoveLiquidity);
         assertFalse(flags.beforeDonate);
         assertFalse(flags.afterDonate);
-        assertFalse(flags.beforeSwapReturnDelta);
+        assertTrue(flags.beforeSwapReturnDelta);
         assertFalse(flags.afterSwapReturnDelta);
     }
 
@@ -185,6 +213,9 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_DirectIntentMatchingWithSignatures() public {
+        uint256 traderAToken0Before = token0.balanceOf(traderA);
+        uint256 traderBToken1Before = token1.balanceOf(traderB);
+
         IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
             traderAKey,
             Currency.unwrap(currency0),
@@ -212,6 +243,12 @@ contract FairRailHookTest is Test {
         // Nonces should have incremented
         assertEq(matcher.userNonces(traderA), 1);
         assertEq(matcher.userNonces(traderB), 1);
+
+        // Verify actual token transfers occurred
+        assertEq(token0.balanceOf(traderA), traderAToken0Before - 10 ether); // A sent token0
+        assertEq(token0.balanceOf(traderB), 1000 ether + 10 ether);          // B received token0
+        assertEq(token1.balanceOf(traderB), traderBToken1Before - 10 ether); // B sent token1
+        assertEq(token1.balanceOf(traderA), 1000 ether + 10 ether);          // A received token1
     }
 
     function test_NonceIncrements() public {
@@ -242,12 +279,35 @@ contract FairRailHookTest is Test {
         assertEq(matcher.userNonces(traderB), 2);
     }
 
-    function test_BatchMatchingSimulation() public view {
+    function test_BatchMatchingSimulation() public {
+        // Submit a counter-intent from traderB: wants to sell token1 and buy token0
+        IntentMatcher.TradeIntent memory counterIntent = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            40 ether,
+            40 ether,
+            0,
+            block.timestamp + 100
+        );
+        matcher.submitPendingIntent(counterIntent);
+
+        // processBatchMatching looks for counter-intents that sell currency1 and buy currency0
         IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
             Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
         );
+        // The counter-intent has 40 ether available, so 40 ether is matched
         assertEq(res.matchedAmount, 40 ether);
         assertEq(res.remainingAmountIn, 60 ether);
+    }
+
+    function test_BatchMatchingNoCounterIntents() public {
+        // With an empty queue, nothing should match
+        IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
+            Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
+        );
+        assertEq(res.matchedAmount, 0);
+        assertEq(res.remainingAmountIn, 100 ether);
     }
 
     // ──────────────────────────────────────────────────────
@@ -470,11 +530,84 @@ contract FairRailHookTest is Test {
         auction.withdrawProtocolTreasury(traderA);
     }
 
+    function test_LpRevenueWithdrawal() public {
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
+
+        // Searcher bids 1 ETH
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 1 ether}(poolId);
+
+        // Hook settles — 0.8 ETH goes to LP revenue
+        vm.prank(address(hook));
+        auction.settleAuction(poolId);
+        assertEq(auction.getAccruedLpRevenue(poolId), 0.8 ether);
+
+        // Withdraw LP revenue to a recipient
+        address lpRecipient = address(0x7777);
+        vm.prank(address(hook));
+        uint256 withdrawn = auction.withdrawLpRevenue(poolId, lpRecipient);
+
+        assertEq(withdrawn, 0.8 ether);
+        assertEq(lpRecipient.balance, 0.8 ether);
+        assertEq(auction.getAccruedLpRevenue(poolId), 0);
+    }
+
+    function test_ClaimLpRevenueViaHook() public {
+        bytes32 rawPoolId = PoolId.unwrap(poolKey.toId());
+
+        // Searcher bids 2 ETH
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 2 ether}(rawPoolId);
+
+        // afterSwap settles the auction
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+        vm.prank(poolManager);
+        hook.afterSwap(traderA, poolKey, params, BalanceDelta.wrap(0), "");
+
+        // LP revenue should be 80% of 2 ETH = 1.6 ETH
+        assertEq(auction.getAccruedLpRevenue(rawPoolId), 1.6 ether);
+
+        // Anyone can call claimLpRevenue on the hook
+        address payable lpDist = payable(address(0x8888));
+        PoolId poolId = poolKey.toId();
+        uint256 claimed = hook.claimLpRevenue(poolId, lpDist);
+
+        assertEq(claimed, 1.6 ether);
+        assertEq(lpDist.balance, 1.6 ether);
+        assertEq(auction.getAccruedLpRevenue(rawPoolId), 0);
+    }
+
+    function test_RevertClaimLpRevenueNothingAccrued() public {
+        PoolId poolId = poolKey.toId();
+        address payable lpDist = payable(address(0x8888));
+
+        vm.expectRevert(MevAuction.NothingToWithdraw.selector);
+        hook.claimLpRevenue(poolId, lpDist);
+    }
+
     // ──────────────────────────────────────────────────────
     //  Hook Callback Tests
     // ──────────────────────────────────────────────────────
 
     function test_BeforeSwapHookCallback() public {
+        // Submit a counter-intent so beforeSwap has something to match against
+        IntentMatcher.TradeIntent memory counterIntent = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            4 ether,
+            4 ether,
+            0,
+            block.timestamp + 100
+        );
+        matcher.submitPendingIntent(counterIntent);
+
         IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
             amountSpecified: -10 ether,
@@ -487,7 +620,24 @@ contract FairRailHookTest is Test {
 
         PoolId poolId = poolKey.toId();
         (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
-        assertEq(matchedVol, 4 ether); // 40% of 10 ether
+        assertEq(matchedVol, 4 ether); // 4 ether counter-intent matched from 10 ether swap
+    }
+
+    function test_BeforeSwapNoMatch() public {
+        // No pending intents — nothing should match
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        vm.prank(poolManager);
+        (bytes4 selector,,) = hook.beforeSwap(traderA, poolKey, params, "");
+        assertEq(selector, IHooks.beforeSwap.selector);
+
+        PoolId poolId = poolKey.toId();
+        (uint256 matchedVol,) = hook.getPoolMetrics(poolId);
+        assertEq(matchedVol, 0);
     }
 
     function test_AfterSwapHookCallback() public {
