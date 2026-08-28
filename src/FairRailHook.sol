@@ -79,19 +79,17 @@ contract FairRailHook is IHooks {
 
     /**
      * @notice Executes before swap; checks for available off-chain/batch intent matches before AMM routing
-     * @param sender The initial msg.sender for the swap call
      * @param key The key for the pool
      * @param params The parameters for the swap
-     * @param hookData Arbitrary data handed into the PoolManager by the swapper
      * @return bytes4 The function selector for the hook
-     * @return BeforeSwapDelta The hook's delta (zero — no delta modification)
+     * @return BeforeSwapDelta The hook's delta reflecting matched intent volume
      * @return uint24 LP fee override (zero — no override)
      */
     function beforeSwap(
-        address sender,
+        address,
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
-        bytes calldata hookData
+        bytes calldata
     ) external onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
         PoolId poolId = key.toId();
 
@@ -124,20 +122,16 @@ contract FairRailHook is IHooks {
 
     /**
      * @notice Executes after swap; triggers LP-owned MEV auction settlement and captures revenue for LPs
-     * @param sender The initial msg.sender for the swap call
      * @param key The key for the pool
-     * @param params The parameters for the swap
-     * @param delta The amount owed to the caller (positive) or owed to the pool (negative)
-     * @param hookData Arbitrary data handed into the PoolManager by the swapper
      * @return bytes4 The function selector for the hook
      * @return int128 The hook's delta in unspecified currency (zero — no delta)
      */
     function afterSwap(
-        address sender,
+        address,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
-        BalanceDelta delta,
-        bytes calldata hookData
+        IPoolManager.SwapParams calldata,
+        BalanceDelta,
+        bytes calldata
     ) external onlyPoolManager returns (bytes4, int128) {
         PoolId poolId = key.toId();
 

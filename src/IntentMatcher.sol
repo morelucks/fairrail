@@ -62,12 +62,6 @@ contract IntentMatcher {
         uint256 outputAmount
     );
 
-    event BatchMatched(
-        bytes32 indexed batchId,
-        uint256 totalIntents,
-        uint256 totalVolumeMatched,
-        uint256 unmatchedVolumeRoutedToAMM
-    );
 
     // ──────────────────────────────────────────────────────
     //  Errors
@@ -385,5 +379,34 @@ contract IntentMatcher {
         result.remainingAmountIn = remaining;
         result.filledAmountOut = totalFilled;
     }
-}
 
+    /**
+     * @notice Compacts the pending intent queue for a token pair by removing consumed and expired entries.
+     *         Callable by anyone to prevent unbounded gas growth from stale queue entries.
+     * @param tokenIn The input token of the pair to clean up
+     * @param tokenOut The output token of the pair to clean up
+     * @return removed The number of entries removed
+     */
+    function cleanupPendingIntents(address tokenIn, address tokenOut) external returns (uint256 removed) {
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenIn, tokenOut));
+        TradeIntent[] storage intents = _pendingIntents[pairHash];
+
+        uint256 writeIdx = 0;
+        for (uint256 readIdx = 0; readIdx < intents.length; readIdx++) {
+            // Keep the intent if it still has volume and hasn't expired
+            if (intents[readIdx].amountIn > 0 && block.timestamp <= intents[readIdx].deadline) {
+                if (writeIdx != readIdx) {
+                    intents[writeIdx] = intents[readIdx];
+                }
+                writeIdx++;
+            }
+        }
+
+        removed = intents.length - writeIdx;
+
+        // Pop removed entries from the end
+        for (uint256 i = 0; i < removed; i++) {
+            intents.pop();
+        }
+    }
+}
