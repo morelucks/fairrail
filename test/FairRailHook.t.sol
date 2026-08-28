@@ -310,6 +310,116 @@ contract FairRailHookTest is Test {
         assertEq(res.remainingAmountIn, 100 ether);
     }
 
+    function test_BatchMatchingMultipleCounterIntents() public {
+        // Submit two small counter-intents from traderB (10 ether each)
+        IntentMatcher.TradeIntent memory ci1 = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(ci1);
+
+        // traderA submits another counter-intent (nonce 0 for traderA)
+        IntentMatcher.TradeIntent memory ci2 = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            15 ether, 15 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(ci2);
+
+        // Process incoming 100 ether — should match 10 + 15 = 25 ether total
+        IntentMatcher.MatchResult memory res = matcher.processBatchMatching(
+            Currency.unwrap(currency0), Currency.unwrap(currency1), 100 ether
+        );
+        assertEq(res.matchedAmount, 25 ether);
+        assertEq(res.remainingAmountIn, 75 ether);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  submitPendingIntent — Revert Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_RevertSubmitPendingIntentExpired() public {
+        IntentMatcher.TradeIntent memory intent = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp - 1 // expired
+        );
+        vm.expectRevert(IntentMatcher.IntentExpired.selector);
+        matcher.submitPendingIntent(intent);
+    }
+
+    function test_RevertSubmitPendingIntentBadNonce() public {
+        IntentMatcher.TradeIntent memory intent = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 5, block.timestamp + 100 // nonce 5 but expected 0
+        );
+        vm.expectRevert(IntentMatcher.InvalidNonce.selector);
+        matcher.submitPendingIntent(intent);
+    }
+
+    function test_RevertSubmitPendingIntentBadSignature() public {
+        // Create intent for traderB but sign with traderA's key
+        IntentMatcher.TradeIntent memory intent = IntentMatcher.TradeIntent({
+            trader: traderB,
+            tokenIn: Currency.unwrap(currency1),
+            tokenOut: Currency.unwrap(currency0),
+            amountIn: 10 ether,
+            minAmountOut: 10 ether,
+            nonce: 0,
+            deadline: block.timestamp + 100,
+            signature: ""
+        });
+        intent.signature = _signIntent(intent, traderAKey); // wrong key!
+
+        vm.expectRevert(IntentMatcher.InvalidSignature.selector);
+        matcher.submitPendingIntent(intent);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Queue Cleanup Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_CleanupPendingIntents() public {
+        // Submit an intent and then consume it via processBatchMatching
+        IntentMatcher.TradeIntent memory ci = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(ci);
+
+        // Queue should have 1 entry
+        assertEq(matcher.pendingIntentCount(Currency.unwrap(currency1), Currency.unwrap(currency0)), 1);
+
+        // Consume it
+        matcher.processBatchMatching(Currency.unwrap(currency0), Currency.unwrap(currency1), 10 ether);
+
+        // Still 1 entry (zeroed out but not removed)
+        assertEq(matcher.pendingIntentCount(Currency.unwrap(currency1), Currency.unwrap(currency0)), 1);
+
+        // Cleanup
+        uint256 removed = matcher.cleanupPendingIntents(Currency.unwrap(currency1), Currency.unwrap(currency0));
+        assertEq(removed, 1);
+        assertEq(matcher.pendingIntentCount(Currency.unwrap(currency1), Currency.unwrap(currency0)), 0);
+    }
+
+    function test_ClaimLpRevenueTwiceReverts() public {
+        bytes32 rawPoolId = PoolId.unwrap(poolKey.toId());
+
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 1 ether}(rawPoolId);
+
+        vm.prank(address(hook));
+        auction.settleAuction(rawPoolId);
+
+        // First claim succeeds
+        address payable lpDist = payable(address(0x8888));
+        PoolId poolId = poolKey.toId();
+        hook.claimLpRevenue(poolId, lpDist);
+
+        // Second claim should revert — nothing left
+        vm.expectRevert(MevAuction.NothingToWithdraw.selector);
+        hook.claimLpRevenue(poolId, lpDist);
+    }
+
     // ──────────────────────────────────────────────────────
     //  IntentMatcher — Revert Tests
     // ──────────────────────────────────────────────────────
