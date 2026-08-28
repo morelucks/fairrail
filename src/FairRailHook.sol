@@ -232,4 +232,26 @@ contract FairRailHook is IHooks {
     function getPoolMetrics(PoolId poolId) external view returns (uint256 matchedVolume, uint256 totalLpMevAccrued) {
         return (totalMatchedVolume[poolId], totalMevRecapturedForLPs[poolId]);
     }
+
+    // ──────────────────────────────────────────────────────
+    //  LP Revenue Distribution
+    // ──────────────────────────────────────────────────────
+
+    event LpRevenueClaimed(PoolId indexed poolId, address indexed recipient, uint256 amount);
+
+    /**
+     * @notice Claims accumulated LP MEV revenue for a specific pool and sends it to the designated recipient.
+     *         Callable by anyone — the revenue belongs to LPs and should be distributable permissionlessly.
+     * @param poolId The pool identifier
+     * @param recipient Address to receive the accumulated LP revenue (e.g., LP reward distributor or multisig)
+     * @return amount The amount of ETH claimed
+     */
+    function claimLpRevenue(PoolId poolId, address payable recipient) external returns (uint256 amount) {
+        amount = mevAuction.withdrawLpRevenue(PoolId.unwrap(poolId), recipient);
+        emit LpRevenueClaimed(poolId, recipient, amount);
+    }
+
+    /// @notice Allows hook to receive ETH (e.g., from MevAuction refunds or protocol treasury)
+    receive() external payable {}
 }
+

@@ -115,6 +115,24 @@ contract MevAuction {
         if (!success) revert WithdrawFailed();
     }
 
+    event LpRevenueWithdrawn(bytes32 indexed poolId, address indexed recipient, uint256 amount);
+
+    /**
+     * @notice Allows the hook contract to withdraw accumulated LP revenue for a specific pool.
+     *         This transfers the actual ETH to the designated recipient (LP reward distributor).
+     * @param poolId Identifier of the Uniswap v4 pool
+     * @param to Address to receive the LP revenue (e.g., LP reward distributor, multisig, or donation contract)
+     * @return amount The amount of ETH withdrawn
+     */
+    function withdrawLpRevenue(bytes32 poolId, address to) external onlyHook returns (uint256 amount) {
+        amount = totalLpRevenuePool[poolId];
+        if (amount == 0) revert NothingToWithdraw();
+        totalLpRevenuePool[poolId] = 0;
+        (bool success, ) = payable(to).call{value: amount}("");
+        if (!success) revert WithdrawFailed();
+        emit LpRevenueWithdrawn(poolId, to, amount);
+    }
+
     /**
      * @notice Returns total accrued MEV/LVR yield captured for a given pool
      */
@@ -122,3 +140,4 @@ contract MevAuction {
         return totalLpRevenuePool[poolId];
     }
 }
+

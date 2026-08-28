@@ -83,7 +83,7 @@ contract FairRailHookTest is Test {
 
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
-        hook = FairRailHook(address(flags));
+        hook = FairRailHook(payable(address(flags)));
         auction = hook.mevAuction();
 
         poolKey = PoolKey({
@@ -528,6 +528,67 @@ contract FairRailHookTest is Test {
         vm.prank(traderA);
         vm.expectRevert(MevAuction.Unauthorized.selector);
         auction.withdrawProtocolTreasury(traderA);
+    }
+
+    function test_LpRevenueWithdrawal() public {
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
+
+        // Searcher bids 1 ETH
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 1 ether}(poolId);
+
+        // Hook settles — 0.8 ETH goes to LP revenue
+        vm.prank(address(hook));
+        auction.settleAuction(poolId);
+        assertEq(auction.getAccruedLpRevenue(poolId), 0.8 ether);
+
+        // Withdraw LP revenue to a recipient
+        address lpRecipient = address(0x7777);
+        vm.prank(address(hook));
+        uint256 withdrawn = auction.withdrawLpRevenue(poolId, lpRecipient);
+
+        assertEq(withdrawn, 0.8 ether);
+        assertEq(lpRecipient.balance, 0.8 ether);
+        assertEq(auction.getAccruedLpRevenue(poolId), 0);
+    }
+
+    function test_ClaimLpRevenueViaHook() public {
+        bytes32 rawPoolId = PoolId.unwrap(poolKey.toId());
+
+        // Searcher bids 2 ETH
+        vm.deal(searcher, 5 ether);
+        vm.prank(searcher);
+        auction.submitBid{value: 2 ether}(rawPoolId);
+
+        // afterSwap settles the auction
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -10 ether,
+            sqrtPriceLimitX96: 0
+        });
+        vm.prank(poolManager);
+        hook.afterSwap(traderA, poolKey, params, BalanceDelta.wrap(0), "");
+
+        // LP revenue should be 80% of 2 ETH = 1.6 ETH
+        assertEq(auction.getAccruedLpRevenue(rawPoolId), 1.6 ether);
+
+        // Anyone can call claimLpRevenue on the hook
+        address payable lpDist = payable(address(0x8888));
+        PoolId poolId = poolKey.toId();
+        uint256 claimed = hook.claimLpRevenue(poolId, lpDist);
+
+        assertEq(claimed, 1.6 ether);
+        assertEq(lpDist.balance, 1.6 ether);
+        assertEq(auction.getAccruedLpRevenue(rawPoolId), 0);
+    }
+
+    function test_RevertClaimLpRevenueNothingAccrued() public {
+        PoolId poolId = poolKey.toId();
+        address payable lpDist = payable(address(0x8888));
+
+        vm.expectRevert(MevAuction.NothingToWithdraw.selector);
+        hook.claimLpRevenue(poolId, lpDist);
     }
 
     // ──────────────────────────────────────────────────────
