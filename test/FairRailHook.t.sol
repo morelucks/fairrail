@@ -15,6 +15,7 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import "../src/IntentMatcher.sol";
 import "../src/MevAuction.sol";
 import "../src/FairRailHook.sol";
+import {TestERC20} from "v4-core/test/TestERC20.sol";
 
 contract FairRailHookTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -35,6 +36,8 @@ contract FairRailHookTest is Test {
     address public searcher = address(0xCCCC);
     address public searcher2 = address(0xDDDD);
 
+    TestERC20 public token0;
+    TestERC20 public token1;
     Currency public currency0;
     Currency public currency1;
 
@@ -47,6 +50,34 @@ contract FairRailHookTest is Test {
 
         matcher = new IntentMatcher();
 
+        // Deploy real ERC-20 tokens for intent matching tests
+        token0 = new TestERC20(0);
+        token1 = new TestERC20(0);
+
+        // Ensure token0 address < token1 address (Uniswap v4 canonical ordering)
+        if (address(token0) > address(token1)) {
+            (token0, token1) = (token1, token0);
+        }
+
+        currency0 = Currency.wrap(address(token0));
+        currency1 = Currency.wrap(address(token1));
+
+        // Mint tokens to traders
+        token0.mint(traderA, 1000 ether);
+        token1.mint(traderA, 1000 ether);
+        token0.mint(traderB, 1000 ether);
+        token1.mint(traderB, 1000 ether);
+
+        // Traders approve IntentMatcher to spend their tokens
+        vm.prank(traderA);
+        token0.approve(address(matcher), type(uint256).max);
+        vm.prank(traderA);
+        token1.approve(address(matcher), type(uint256).max);
+        vm.prank(traderB);
+        token0.approve(address(matcher), type(uint256).max);
+        vm.prank(traderB);
+        token1.approve(address(matcher), type(uint256).max);
+
         // FairRailHook requires beforeSwap (1<<7 = 0x80) and afterSwap (1<<6 = 0x40) flags
         uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
 
@@ -54,9 +85,6 @@ contract FairRailHookTest is Test {
         deployCodeTo("FairRailHook.sol:FairRailHook", constructorArgs, address(flags));
         hook = FairRailHook(address(flags));
         auction = hook.mevAuction();
-
-        currency0 = Currency.wrap(address(0x1000));
-        currency1 = Currency.wrap(address(0x2000));
 
         poolKey = PoolKey({
             currency0: currency0,
@@ -185,6 +213,9 @@ contract FairRailHookTest is Test {
     // ──────────────────────────────────────────────────────
 
     function test_DirectIntentMatchingWithSignatures() public {
+        uint256 traderAToken0Before = token0.balanceOf(traderA);
+        uint256 traderBToken1Before = token1.balanceOf(traderB);
+
         IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
             traderAKey,
             Currency.unwrap(currency0),
@@ -212,6 +243,12 @@ contract FairRailHookTest is Test {
         // Nonces should have incremented
         assertEq(matcher.userNonces(traderA), 1);
         assertEq(matcher.userNonces(traderB), 1);
+
+        // Verify actual token transfers occurred
+        assertEq(token0.balanceOf(traderA), traderAToken0Before - 10 ether); // A sent token0
+        assertEq(token0.balanceOf(traderB), 1000 ether + 10 ether);          // B received token0
+        assertEq(token1.balanceOf(traderB), traderBToken1Before - 10 ether); // B sent token1
+        assertEq(token1.balanceOf(traderA), 1000 ether + 10 ether);          // A received token1
     }
 
     function test_NonceIncrements() public {

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
+
 /**
  * @title IntentMatcher
  * @notice Manages off-chain signed trade intents and peer-to-peer batch matching
  * @dev Pre-filters swap flow before hitting the Uniswap v4 AMM pool, reducing slippage and LVR exposure.
  *      Uses EIP-712 structured data signing for intent authentication and nonce-based replay protection.
+ *      Traders must approve this contract to spend their tokens before submitting intents.
  */
 contract IntentMatcher {
     struct TradeIntent {
@@ -75,6 +78,7 @@ contract IntentMatcher {
     error IntentAlreadyExecuted();
     error IncompatibleTokens();
     error InvalidNonce();
+    error TransferFailed();
 
     // ──────────────────────────────────────────────────────
     //  Constructor
@@ -168,7 +172,9 @@ contract IntentMatcher {
     // ──────────────────────────────────────────────────────
 
     /**
-     * @notice Matches two counter-intents after verifying EIP-712 signatures and nonces
+     * @notice Matches two counter-intents after verifying EIP-712 signatures and nonces.
+     *         Transfers tokens between both traders via ERC-20 transferFrom.
+     *         Both traders must have approved this contract to spend their tokenIn.
      * @param intentA User A buying tokenOut for tokenIn
      * @param intentB User B buying tokenIn for tokenOut
      * @return matchedInA Amount matched from intent A
@@ -213,6 +219,15 @@ contract IntentMatcher {
         executedIntents[hashB] = true;
         userNonces[intentA.trader]++;
         userNonces[intentB.trader]++;
+
+        // 8. Execute token transfers (traders must have approved this contract)
+        //    A sends tokenIn (= B's tokenOut) to B
+        //    B sends tokenIn (= A's tokenOut) to A
+        bool successA = IERC20Minimal(intentA.tokenIn).transferFrom(intentA.trader, intentB.trader, matchedInA);
+        if (!successA) revert TransferFailed();
+
+        bool successB = IERC20Minimal(intentB.tokenIn).transferFrom(intentB.trader, intentA.trader, matchedInB);
+        if (!successB) revert TransferFailed();
 
         emit IntentMatched(hashA, intentA.trader, intentA.tokenIn, intentA.tokenOut, matchedInA, matchedInB);
         emit IntentMatched(hashB, intentB.trader, intentB.tokenIn, intentB.tokenOut, matchedInB, matchedInA);
