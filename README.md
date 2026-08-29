@@ -1,8 +1,8 @@
-# 🚆 FairRail
+# FairRail
 
 > **Private Intent Matching & LP-Owned MEV Auctions on Uniswap v4**
 > 
-> *Turning MEV from an LP liability into a sustainable LP revenue stream.*
+> *Converting Loss-Versus-Rebalancing (LVR) and MEV from an LP liability into a sustainable liquidity revenue stream.*
 
 [![Uniswap v4 Hook](https://img.shields.io/badge/Uniswap_v4-Hook-ff007a?style=flat-square&logo=uniswap)](https://uniswap.org)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636?style=flat-square&logo=solidity)](https://soliditylang.org)
@@ -12,11 +12,11 @@
 
 ---
 
-## 💡 Executive Summary
+## Executive Summary
 
 **FairRail** is a custom **Uniswap v4 Hook** designed for the **Uniswap Hookathon (UHI10)** under the **Sustainable Liquidity and MEV Protection** theme.
 
-In traditional AMMs, liquidity providers (LPs) bear the brunt of **Loss-Versus-Rebalancing (LVR)** and arbitrage leakage—where external searchers extract profit from price latency and block position at the expense of passive LPs. Furthermore, every retail swap directly hits the pool, incurring slippage, gas overhead, and unnecessary MEV exposure.
+In traditional Automated Market Makers (AMMs), liquidity providers (LPs) bear the brunt of **Loss-Versus-Rebalancing (LVR)** and arbitrage leakage—where external searchers extract profit from price latency and block position at the expense of passive LPs. Furthermore, every retail swap directly hits the pool, incurring slippage, gas overhead, and unnecessary MEV exposure.
 
 FairRail solves this by combining two complementary mechanisms:
 1. **Private Intent Batch Matching**: Before routing trades directly to the AMM, FairRail checks for compatible counter-intents. Overlapping order flow is matched off-chain/in-batch, shielding users from slippage, gas waste, and toxic MEV.
@@ -24,23 +24,23 @@ FairRail solves this by combining two complementary mechanisms:
 
 ---
 
-## 🌐 Deployed & Verified Contracts (Ethereum Sepolia)
+## Deployed & Verified Contracts (Ethereum Sepolia)
 
-All contracts are deployed live on **Ethereum Sepolia Testnet** and **100% verified** on Etherscan:
+All contracts are deployed live on **Ethereum Sepolia Testnet** and verified on Etherscan:
 
 | Contract | Address | Etherscan Link |
 | :--- | :--- | :--- |
-| 🪝 **`FairRailHook`** | `0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8#code) |
-| 📜 **`IntentMatcher`** | `0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829#code) |
-| ⚡ **`MevAuction`** | `0x08c8ababe136a66e10d5c20f6553f9726284343c` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x08c8ababe136a66e10d5c20f6553f9726284343c#code) |
-| 🦄 **`PoolManager`** | `0x000000000004444c5dc75cB358380D2e3dE08A90` | Canonical Uniswap v4 PoolManager |
+| **`FairRailHook`** | `0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8#code) |
+| **`IntentMatcher`** | `0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829#code) |
+| **`MevAuction`** | `0x08c8ababe136a66e10d5c20f6553f9726284343c` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x08c8ababe136a66e10d5c20f6553f9726284343c#code) |
+| **`PoolManager`** | `0x000000000004444c5dc75cB358380D2e3dE08A90` | Canonical Uniswap v4 PoolManager |
 
 - **Chain ID**: `11155111` (Ethereum Sepolia)
 - **Hook Permissions Encoded**: `BEFORE_SWAP` (`0x80`), `AFTER_SWAP` (`0x40`), `BEFORE_SWAP_RETURNS_DELTA` (`0x4000`)
 
 ---
 
-## 🎯 Key Problems Addressed
+## Key Problems Addressed
 
 | Problem | Traditional AMM Impact | FairRail Solution |
 | :--- | :--- | :--- |
@@ -50,7 +50,7 @@ All contracts are deployed live on **Ethereum Sepolia Testnet** and **100% verif
 
 ---
 
-## 🏗️ Architecture & Mechanism
+## Architecture & Mechanism
 
 ```mermaid
 sequenceDiagram
@@ -79,20 +79,21 @@ sequenceDiagram
 
 ---
 
-## 🧩 Smart Contract Architecture
+## Smart Contract Architecture
 
 ```
 fairrail/
 ├── src/
-│   ├── FairRailHook.sol   # Core Uniswap v4 Hook implementing beforeSwap / afterSwap
-│   ├── IntentMatcher.sol  # Off-chain intent verification & batch matching engine
-│   └── MevAuction.sol     # LP-owned MEV & LVR auction pool
+│   ├── FairRailHook.sol     # Core Uniswap v4 Hook implementing beforeSwap / afterSwap
+│   ├── IntentMatcher.sol    # Off-chain intent verification & batch matching engine
+│   └── MevAuction.sol       # LP-owned MEV & LVR auction pool
+├── frontend/                # Web3 React + Vite Demo Application
 ├── test/
-│   └── FairRailHook.t.sol # Comprehensive Foundry test suite
+│   └── FairRailHook.t.sol   # Comprehensive Foundry test suite
 ├── script/
 │   └── DeployFairRail.s.sol # Hook deployment & address mining script
-├── foundry.toml           # Foundry configuration
-└── LICENSE                # MIT License
+├── foundry.toml             # Foundry configuration
+└── LICENSE                  # MIT License
 ```
 
 ### 1. `FairRailHook.sol`
@@ -103,19 +104,23 @@ Implements Uniswap v4 `beforeSwap` and `afterSwap` hooks:
 ### 2. `IntentMatcher.sol`
 Validates EIP-712 / custom signed trade intents:
 - Direct P2P intent matching (`matchDirectIntents`).
-- Batch matching simulation (`processBatchMatching`) returning matched volume vs residual AMM flow.
+- Batch matching engine (`processBatchMatching`) returning matched volume vs residual AMM flow.
+- Storage queue compaction (`cleanupPendingIntents`).
 
 ### 3. `MevAuction.sol`
 An on-chain competitive bidding system for searchers:
 - `submitBid(bytes32 poolId)`: Searchers place ETH bids for backrunning rights on a specific pool.
 - `settleAuction(bytes32 poolId)`: Called exclusively by `FairRailHook` during `afterSwap` to allocate yield.
+- `withdrawRefund()`: Pull pattern for outbid searcher refund claims.
+- `withdrawLpRevenue(bytes32 poolId, address to)`: Withdraws accumulated ETH yield to LPs.
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 - [Foundry](https://getfoundry.sh/) (solc `0.8.26` / `cancun` EVM target)
+- Node.js (v18+)
 - Git
 
 ### Installation & Setup
@@ -125,7 +130,7 @@ An on-chain competitive bidding system for searchers:
 git clone https://github.com/morelucks/fairrail.git
 cd fairrail
 
-# Install dependencies
+# Install Foundry dependencies
 forge install
 ```
 
@@ -142,7 +147,7 @@ forge test
 forge test -vvvv
 ```
 
-### 🖥️ Running the Demo Web UI
+### Running the Demo Web UI
 
 ```bash
 # Navigate to frontend directory
@@ -155,23 +160,23 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000` to interact with the **Trader Portal**, **Pending Intent Queue**, **Searcher MEV Auction**, and **LP Yield Dashboard** connected to Sepolia testnet!
+Visit `http://localhost:3000` to interact with the **Trader Portal**, **Pending Intent Queue**, **Searcher MEV Auction**, and **LP Yield Dashboard** connected to Sepolia testnet.
 
 ---
 
-## 🔬 Test Coverage Highlights
+## Test Coverage Highlights
 
 The Foundry test suite (`test/FairRailHook.t.sol`) verifies:
-- ✅ **Hook Permissions**: Ensures `beforeSwap` and `afterSwap` flags are correctly configured.
-- ✅ **Intent Hashing & Matching**: Validates trade intent signature hashes and P2P counter-order execution.
-- ✅ **Batch Matching Simulation**: Tests net volume calculation when routing unmatched trade portions to AMM.
-- ✅ **Searcher Bidding**: Simulates competitive MEV auction bids and validates refund logic for outbid searchers.
-- ✅ **LP Yield Accrual**: Verifies that 80% of winning auction bids are credited to LPs upon `afterSwap`.
-- ✅ **Property-Based Fuzz Testing**: Property-based fuzz tests verify auction revenue splits and fill invariants across 256+ random runs.
+- **Hook Permissions**: Ensures `beforeSwap` and `afterSwap` flags are correctly configured.
+- **Intent Hashing & Matching**: Validates trade intent signature hashes and P2P counter-order execution.
+- **Batch Matching Engine**: Tests net volume calculation when routing unmatched trade portions to AMM.
+- **Searcher Bidding**: Simulates competitive MEV auction bids and validates refund logic for outbid searchers.
+- **LP Yield Accrual**: Verifies that 80% of winning auction bids are credited to LPs upon `afterSwap`.
+- **Property-Based Fuzz Testing**: Property-based fuzz tests verify auction revenue splits and fill invariants across 256+ random runs.
 
 ---
 
-## ⛽ Gas Benchmark Summary
+## Gas Benchmark Summary
 
 | Contract | Function | Avg Gas Cost | Median Gas |
 | :--- | :--- | :---: | :---: |
@@ -184,15 +189,15 @@ The Foundry test suite (`test/FairRailHook.t.sol`) verifies:
 
 ---
 
-## 🗺️ Roadmap & Future Architecture
+## Roadmap & Future Architecture
 
-- **Phase 1 (Current - UHI10)**: Core Uniswap v4 Hook implementation, batch intent matcher simulation, and LP MEV auction engine.
+- **Phase 1 (Current - UHI10)**: Core Uniswap v4 Hook implementation, batch intent matcher engine, LP MEV auction pool, and Web3 Demo UI.
 - **Phase 2 (FHE Integration)**: Incorporating Fully Homomorphic Encryption (FHE via Inco / Zama) for confidential encrypted intent orderbooks, eliminating frontrunning prior to matching.
 - **Phase 3 (EigenLayer AVS)**: Deploying a dedicated Actively Validated Service (AVS) for decentralized off-chain intent batching and searcher execution verification with automated slashing.
 
 ---
 
-## 📋 Hackathon Submission Details
+## Hackathon Submission Details
 
 - **Project Name**: FairRail
 - **Hackathon**: Uniswap Hookathon (UHI10)
@@ -203,6 +208,6 @@ The Foundry test suite (`test/FairRailHook.t.sol`) verifies:
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
