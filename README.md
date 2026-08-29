@@ -83,17 +83,27 @@ sequenceDiagram
 
 ```
 fairrail/
-├── src/
-│   ├── FairRailHook.sol     # Core Uniswap v4 Hook implementing beforeSwap / afterSwap
-│   ├── IntentMatcher.sol    # Off-chain intent verification & batch matching engine
-│   └── MevAuction.sol       # LP-owned MEV & LVR auction pool
+├── contracts/               # Smart Contracts & Foundry Suite
+│   ├── src/
+│   │   ├── FairRailHook.sol   # Core Uniswap v4 Hook implementing beforeSwap / afterSwap
+│   │   ├── IntentMatcher.sol  # Off-chain intent verification & batch matching engine
+│   │   └── MevAuction.sol     # LP-owned MEV & LVR auction pool
+│   ├── test/
+│   │   └── FairRailHook.t.sol # Comprehensive Foundry test suite
+│   ├── script/
+│   │   └── DeployFairRail.s.sol # Hook deployment & salt mining script
+│   └── foundry.toml           # Foundry configuration
 ├── frontend/                # Web3 React + Vite Demo Application
-├── test/
-│   └── FairRailHook.t.sol   # Comprehensive Foundry test suite
-├── script/
-│   └── DeployFairRail.s.sol # Hook deployment & address mining script
-├── foundry.toml             # Foundry configuration
-└── LICENSE                  # MIT License
+│   ├── src/
+│   │   ├── components/        # React Web3 UI components
+│   │   └── config/            # ABIs and Sepolia contract addresses
+│   ├── package.json
+│   ├── vite.config.js
+│   └── index.html
+├── .gitignore
+├── .env
+├── LICENSE
+└── README.md
 ```
 
 ### 1. `FairRailHook.sol`
@@ -123,31 +133,31 @@ An on-chain competitive bidding system for searchers:
 - Node.js (v18+)
 - Git
 
-### Installation & Setup
+### Installation
 
 ```bash
 # Clone repository
 git clone https://github.com/morelucks/fairrail.git
 cd fairrail
+```
+
+### Smart Contracts (Build & Test)
+
+```bash
+# Navigate to contracts directory
+cd contracts
 
 # Install Foundry dependencies
 forge install
-```
 
-### Build & Test
-
-```bash
-# Compile smart contracts
+# Compile contracts
 forge build
 
-# Run unit and integration tests
+# Run full test suite (41/41 passing)
 forge test
-
-# Run tests with detailed trace
-forge test -vvvv
 ```
 
-### Running the Demo Web UI
+### Demo Web UI (Development & Build)
 
 ```bash
 # Navigate to frontend directory

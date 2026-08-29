@@ -1,9 +1,16 @@
-# Compiler outputs
+# Compiler & Build outputs
 out/
+**/out/
 cache/
+**/cache/
+broadcast/
+**/broadcast/
+dist/
+**/dist/
 
 # Dependencies
-lib/
+node_modules/
+**/node_modules/
 
 # IDE files
 .vscode/
@@ -15,3 +22,4 @@ lib/
 
 # Environment variables
 .env
+*.env
