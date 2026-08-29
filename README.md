@@ -152,6 +152,20 @@ The Foundry test suite (`test/FairRailHook.t.sol`) verifies:
 - ✅ **Batch Matching Simulation**: Tests net volume calculation when routing unmatched trade portions to AMM.
 - ✅ **Searcher Bidding**: Simulates competitive MEV auction bids and validates refund logic for outbid searchers.
 - ✅ **LP Yield Accrual**: Verifies that 80% of winning auction bids are credited to LPs upon `afterSwap`.
+- ✅ **Property-Based Fuzz Testing**: Property-based fuzz tests verify auction revenue splits and fill invariants across 256+ random runs.
+
+---
+
+## ⛽ Gas Benchmark Summary
+
+| Contract | Function | Avg Gas Cost | Median Gas |
+| :--- | :--- | :---: | :---: |
+| **`IntentMatcher`** | `matchDirectIntents` | 90,678 gas | 42,821 gas |
+| **`IntentMatcher`** | `processBatchMatching` | 87,882 gas | 87,880 gas |
+| **`IntentMatcher`** | `submitPendingIntent` | 187,542 gas | 277,927 gas |
+| **`MevAuction`** | `submitBid` | 92,036 gas | 112,860 gas |
+| **`MevAuction`** | `settleAuction` | 61,428 gas | 71,289 gas |
+| **`MevAuction`** | `withdrawLpRevenue` | 61,192 gas | 61,192 gas |
 
 ---
 

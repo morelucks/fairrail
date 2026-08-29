@@ -800,4 +800,71 @@ contract FairRailHookTest is Test {
         PoolId poolId = poolKey.toId();
         assertTrue(PoolId.unwrap(poolId) != bytes32(0));
     }
+
+    // ──────────────────────────────────────────────────────
+    //  Fuzz Tests
+    // ──────────────────────────────────────────────────────
+
+    function testFuzz_MevAuctionBiddingSplit(uint96 rawBid) public {
+        vm.assume(rawBid > 0 && rawBid <= 1000 ether);
+
+        bytes32 poolId = PoolId.unwrap(poolKey.toId());
+
+        vm.deal(searcher, uint256(rawBid));
+        vm.prank(searcher);
+        auction.submitBid{value: rawBid}(poolId);
+
+        vm.prank(address(hook));
+        uint256 lpRevenue = auction.settleAuction(poolId);
+
+        uint256 expectedLp = (uint256(rawBid) * 80) / 100;
+        uint256 expectedTreasury = uint256(rawBid) - expectedLp;
+
+        assertEq(lpRevenue, expectedLp);
+        assertEq(auction.getAccruedLpRevenue(poolId), expectedLp);
+        assertEq(auction.protocolTreasury(), expectedTreasury);
+        assertEq(lpRevenue + expectedTreasury, uint256(rawBid));
+    }
+
+    function testFuzz_DirectIntentMatchingAmounts(uint96 amountA, uint96 amountB) public {
+        vm.assume(amountA > 1000 && amountA <= 500 ether);
+        vm.assume(amountB > 1000 && amountB <= 500 ether);
+
+        token0.mint(traderA, amountA);
+        token1.mint(traderB, amountB);
+
+        vm.prank(traderA);
+        token0.approve(address(matcher), amountA);
+        vm.prank(traderB);
+        token1.approve(address(matcher), amountB);
+
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey,
+            Currency.unwrap(currency0),
+            Currency.unwrap(currency1),
+            amountA,
+            amountA,
+            0,
+            block.timestamp + 100
+        );
+
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            amountB,
+            amountB,
+            0,
+            block.timestamp + 100
+        );
+
+        (uint256 matchedA, uint256 matchedB) = matcher.matchDirectIntents(intentA, intentB);
+
+        // Fill invariants
+        assertTrue(matchedA <= amountA);
+        assertTrue(matchedB <= amountB);
+        assertEq(matchedA, amountA < amountB ? amountA : amountB);
+        assertEq(matchedB, amountB < amountA ? amountB : amountA);
+    }
 }
+
