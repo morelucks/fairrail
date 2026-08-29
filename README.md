@@ -24,6 +24,22 @@ FairRail solves this by combining two complementary mechanisms:
 
 ---
 
+## 🌐 Deployed & Verified Contracts (Ethereum Sepolia)
+
+All contracts are deployed live on **Ethereum Sepolia Testnet** and **100% verified** on Etherscan:
+
+| Contract | Address | Etherscan Link |
+| :--- | :--- | :--- |
+| 🪝 **`FairRailHook`** | `0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8#code) |
+| 📜 **`IntentMatcher`** | `0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829#code) |
+| ⚡ **`MevAuction`** | `0x08c8ababe136a66e10d5c20f6553f9726284343c` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified_✓-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x08c8ababe136a66e10d5c20f6553f9726284343c#code) |
+| 🦄 **`PoolManager`** | `0x000000000004444c5dc75cB358380D2e3dE08A90` | Canonical Uniswap v4 PoolManager |
+
+- **Chain ID**: `11155111` (Ethereum Sepolia)
+- **Hook Permissions Encoded**: `BEFORE_SWAP` (`0x80`), `AFTER_SWAP` (`0x40`), `BEFORE_SWAP_RETURNS_DELTA` (`0x4000`)
+
+---
+
 ## 🎯 Key Problems Addressed
 
 | Problem | Traditional AMM Impact | FairRail Solution |
