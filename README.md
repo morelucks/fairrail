@@ -142,6 +142,21 @@ forge test
 forge test -vvvv
 ```
 
+### 🖥️ Running the Demo Web UI
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Start local development server
+npm run dev
+```
+
+Visit `http://localhost:3000` to interact with the **Trader Portal**, **Pending Intent Queue**, **Searcher MEV Auction**, and **LP Yield Dashboard** connected to Sepolia testnet!
+
 ---
 
 ## 🔬 Test Coverage Highlights
