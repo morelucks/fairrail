@@ -25,8 +25,6 @@ contract DeployFairRail is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address poolManager = vm.envOr("POOL_MANAGER", address(0x000000000004444c5dc75cB358380D2e3dE08A90));
 
-        // The CREATE2 deployer for `new Contract{salt}()` is the broadcast address (msg.sender)
-        address deployer = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -42,8 +40,10 @@ contract DeployFairRail is Script {
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), address(matcher));
         bytes memory creationCode = abi.encodePacked(type(FairRailHook).creationCode, constructorArgs);
 
-        // Use deployer (broadcast address) since Solidity's `new {salt}` uses msg.sender as CREATE2 deployer
-        (address hookAddress, bytes32 salt) = _mineSalt(deployer, hookFlags, creationCode);
+        // Deterministic CREATE2 deployer proxy used by Forge (0x4e59b44847b379578588920cA78FbF26c0B4956C)
+        address create2Factory = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+
+        (address hookAddress, bytes32 salt) = _mineSalt(create2Factory, hookFlags, creationCode);
         console.log("Mined hook address:", hookAddress);
         console.log("Using salt:");
         console.logBytes32(salt);
