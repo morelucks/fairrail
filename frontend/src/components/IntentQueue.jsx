@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { Layers, RefreshCw, Trash2, CheckCircle2 } from 'lucide-react';
+import { Layers, RefreshCw, Trash2, CheckCircle2, Activity, ArrowRight, Loader2, Zap } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG, INTENT_MATCHER_ABI } from '../config/contracts';
 
 export default function IntentQueue({ provider, signer }) {
@@ -57,105 +57,144 @@ export default function IntentQueue({ provider, signer }) {
   return (
     <div className="glass-card" style={{ padding: '2rem' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      {/* Section Header */}
+      <div className="section-header">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Layers size={20} style={{ color: 'var(--accent-cyan)' }} />
+          <h2 className="section-header__title">
+            <div className="section-header__title-icon section-header__title-icon--cyan">
+              <Layers size={20} />
+            </div>
             Pending Intent Queue
           </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          <p className="section-header__desc">
             Live count of off-chain intents waiting for counter-matches before AMM swap execution.
           </p>
         </div>
-
         <button
           onClick={fetchQueueCount}
           disabled={isLoading}
           className="btn-secondary"
-          style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+          id="btn-refresh-queue"
         >
           <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
           Refresh
         </button>
       </div>
 
-      {/* Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.75rem' }}>
         
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid var(--border-color)',
-          padding: '1.25rem',
-          borderRadius: 'var(--radius-sm)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
-            Queue Length (Pair)
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+        <div className="stat-card stat-card--cyan animate-in">
+          <div className="stat-card__label">Queue Length</div>
+          <div className="stat-card__value" style={{ color: 'var(--accent-cyan-light)' }}>
             {pendingCount}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Active Pending Intents
+          <div className="stat-card__sub">Active Pending Intents</div>
+        </div>
+
+        <div className="stat-card stat-card--emerald animate-in animate-in-delay-1">
+          <div className="stat-card__label">Hook Routing</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', marginBottom: '0.35rem' }}>
+            <span className="badge badge-live">Active</span>
+          </div>
+          <div className="stat-card__sub" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
+            beforeSwap() intercept
           </div>
         </div>
 
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid var(--border-color)',
-          padding: '1.25rem',
-          borderRadius: 'var(--radius-sm)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
-            Execution Routing
+        <div className="stat-card stat-card--purple animate-in animate-in-delay-2">
+          <div className="stat-card__label">Match Engine</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', marginBottom: '0.35rem' }}>
+            <Zap size={18} style={{ color: 'var(--accent-purple-light)' }} />
+            <span style={{ fontWeight: 700, color: 'var(--accent-purple-light)', fontSize: '0.95rem' }}>P2P + Batch</span>
           </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: '0.5rem' }}>
-            `beforeSwap()` Active
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-            Net Delta Offset
-          </div>
+          <div className="stat-card__sub">Net Delta Offset</div>
         </div>
-
       </div>
 
-      {/* Queue Compaction Action */}
+      {/* Intent Flow Diagram */}
       <div style={{
         display: 'flex',
-        justify: 'space-between',
         alignItems: 'center',
-        background: 'rgba(6, 182, 212, 0.08)',
-        border: '1px solid rgba(6, 182, 212, 0.25)',
+        gap: '0.5rem',
         padding: '1rem 1.25rem',
-        borderRadius: 'var(--radius-sm)'
+        borderRadius: 'var(--radius-sm)',
+        background: 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid var(--border-color)',
+        marginBottom: '1.25rem',
+        overflow: 'auto',
       }}>
-        <div>
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#67e8f9' }}>
-            Queue Compaction
-          </div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Compact array storage by purging zeroed-out or expired intents.
-          </div>
-        </div>
-
-        <button
-          onClick={handleCleanup}
-          disabled={isCleaning}
-          className="btn-secondary"
-          style={{ borderColor: 'rgba(6, 182, 212, 0.4)', color: '#67e8f9' }}
-        >
-          <Trash2 size={16} />
-          {isCleaning ? 'Cleaning...' : 'Compact Queue'}
-        </button>
+        {[
+          { label: 'Signed Intent', color: 'var(--accent-purple)', bg: 'var(--accent-purple-dim)' },
+          { label: 'Queue Pool', color: 'var(--accent-cyan)', bg: 'var(--accent-cyan-dim)' },
+          { label: 'Counter-Match', color: 'var(--accent-emerald)', bg: 'var(--accent-emerald-dim)' },
+          { label: 'Settle or AMM', color: 'var(--accent-pink)', bg: 'var(--accent-pink-dim)' },
+        ].map((step, i, arr) => (
+          <React.Fragment key={step.label}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.4rem 0.75rem',
+              borderRadius: 'var(--radius-xs)',
+              background: step.bg,
+              border: `1px solid ${step.color}22`,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: step.color,
+              whiteSpace: 'nowrap',
+            }}>
+              <Activity size={12} />
+              {step.label}
+            </div>
+            {i < arr.length - 1 && (
+              <ArrowRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0, opacity: 0.5 }} />
+            )}
+          </React.Fragment>
+        ))}
       </div>
 
+      {/* Queue Compaction */}
+      <div className="collapsible">
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '1rem 1.25rem',
+        }}>
+          <div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-cyan-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Trash2 size={16} />
+              Queue Compaction
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+              Compact array storage by purging zeroed-out or expired intents.
+            </div>
+          </div>
+          <button
+            onClick={handleCleanup}
+            disabled={isCleaning}
+            className="btn-secondary"
+            style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+            id="btn-compact-queue"
+          >
+            {isCleaning ? (
+              <><Loader2 size={14} className="spin" /> Cleaning...</>
+            ) : (
+              <><Trash2 size={14} /> Compact</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Status */}
       {statusMsg && (
-        <div style={{ fontSize: '0.82rem', color: 'var(--accent-cyan)', marginTop: '0.75rem', textAlign: 'center' }}>
-          {statusMsg}
+        <div className="status-alert status-alert--info" style={{ marginTop: '1rem' }}>
+          <CheckCircle2 size={16} />
+          <span>{statusMsg}</span>
         </div>
       )}
-
     </div>
   );
 }

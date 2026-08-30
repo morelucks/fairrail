@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ethers } from 'ethers';
-import { Shield, Send, CheckCircle2, AlertCircle, ArrowRightLeft } from 'lucide-react';
+import { Shield, Send, CheckCircle2, AlertCircle, ArrowDownUp, Eye, EyeOff, FileSignature, Loader2 } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG, INTENT_MATCHER_ABI } from '../config/contracts';
 
 export default function TraderPortal({ signer, account, onIntentSubmitted }) {
@@ -14,6 +14,7 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
   const [isSigning, setIsSigning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+  const [showSig, setShowSig] = useState(false);
 
   // Swap tokens helper
   const handleSwapTokens = () => {
@@ -131,155 +132,264 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
     }
   };
 
+  const currentStep = signedIntent ? 2 : 1;
+
   return (
     <div className="glass-card" style={{ padding: '2rem' }}>
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+
+      {/* Section Header */}
+      <div className="section-header">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Shield size={20} style={{ color: 'var(--accent-purple)' }} />
+          <h2 className="section-header__title">
+            <div className="section-header__title-icon section-header__title-icon--purple">
+              <Shield size={20} />
+            </div>
             Private Intent Matcher
           </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Trade off-chain with EIP-712 signatures. Zero slippage, zero AMM price impact.
+          <p className="section-header__desc">
+            Trade off-chain with EIP-712 signatures. Zero slippage, zero AMM price impact, zero MEV exposure.
           </p>
         </div>
-        <span className="badge badge-emerald">0% AMM Slippage</span>
+        <span className="badge badge-emerald">0% Slippage</span>
       </div>
 
-      {/* Input Form */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-        
-        {/* Token In & Out */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '0.75rem', alignItems: 'center' }}>
-          <div>
-            <label className="input-label">Token In (Sell)</label>
-            <input
-              type="text"
-              value={tokenIn}
-              onChange={(e) => setTokenIn(e.target.value)}
-              className="input-field"
-              placeholder="0x..."
-            />
+      {/* Step Progress */}
+      <div className="step-progress">
+        <div className={`step-progress__step ${currentStep === 1 ? 'step-progress__step--active' : ''} ${signedIntent ? 'step-progress__step--done' : ''}`}>
+          <div className="step-progress__num">
+            {signedIntent ? <CheckCircle2 size={14} /> : '1'}
           </div>
-
-          <button
-            onClick={handleSwapTokens}
-            className="btn-secondary"
-            style={{ padding: '0.75rem', marginTop: '1.4rem' }}
-            title="Swap tokens"
-          >
-            <ArrowRightLeft size={16} />
-          </button>
-
-          <div>
-            <label className="input-label">Token Out (Buy)</label>
-            <input
-              type="text"
-              value={tokenOut}
-              onChange={(e) => setTokenOut(e.target.value)}
-              className="input-field"
-              placeholder="0x..."
-            />
-          </div>
+          <span>Sign Intent</span>
         </div>
+        <div className="step-progress__connector" style={signedIntent ? { background: 'var(--accent-emerald)' } : {}} />
+        <div className={`step-progress__step ${currentStep === 2 ? 'step-progress__step--active' : ''}`}>
+          <div className="step-progress__num">2</div>
+          <span>Submit to Queue</span>
+        </div>
+      </div>
 
-        {/* Amounts & Deadline */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-          <div>
-            <label className="input-label">Amount In (Tokens)</label>
+      {/* Swap Card */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+
+        {/* Token In */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1.15rem 1.25rem',
+          transition: 'all 0.3s ease',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+            <label className="input-label" style={{ margin: 0, fontSize: '0.75rem' }}>You Sell</label>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Token In</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <input
               type="number"
               step="0.01"
               value={amountIn}
               onChange={(e) => setAmountIn(e.target.value)}
-              className="input-field"
+              className="input-field input-field--lg"
+              style={{ border: 'none', background: 'transparent', padding: '0', flex: 1 }}
+              id="input-amount-in"
             />
+            <div style={{
+              padding: '0.5rem 0.85rem',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.2)',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--accent-purple-light)',
+              whiteSpace: 'nowrap',
+              maxWidth: '160px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {tokenIn.substring(0, 6)}...{tokenIn.substring(tokenIn.length - 4)}
+            </div>
           </div>
+          <input
+            type="text"
+            value={tokenIn}
+            onChange={(e) => setTokenIn(e.target.value)}
+            className="input-field"
+            placeholder="Token address 0x..."
+            style={{ marginTop: '0.6rem', fontSize: '0.78rem', padding: '0.6rem 0.85rem' }}
+            id="input-token-in"
+          />
+        </div>
 
-          <div>
-            <label className="input-label">Min Amount Out</label>
+        {/* Swap Button */}
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.5rem 0', zIndex: 2 }}>
+          <button
+            onClick={handleSwapTokens}
+            className="btn-icon"
+            title="Swap tokens"
+            id="btn-swap-tokens"
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '3px solid var(--bg-void)',
+              borderRadius: '12px',
+              width: '40px',
+              height: '40px',
+            }}
+          >
+            <ArrowDownUp size={16} />
+          </button>
+        </div>
+
+        {/* Token Out */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1.15rem 1.25rem',
+          transition: 'all 0.3s ease',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+            <label className="input-label" style={{ margin: 0, fontSize: '0.75rem' }}>You Buy</label>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Token Out</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <input
               type="number"
               step="0.01"
               value={minAmountOut}
               onChange={(e) => setMinAmountOut(e.target.value)}
-              className="input-field"
+              className="input-field input-field--lg"
+              style={{ border: 'none', background: 'transparent', padding: '0', flex: 1 }}
+              id="input-min-amount-out"
             />
+            <div style={{
+              padding: '0.5rem 0.85rem',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(6, 182, 212, 0.1)',
+              border: '1px solid rgba(6, 182, 212, 0.2)',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--accent-cyan-light)',
+              whiteSpace: 'nowrap',
+              maxWidth: '160px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {tokenOut.substring(0, 6)}...{tokenOut.substring(tokenOut.length - 4)}
+            </div>
           </div>
+          <input
+            type="text"
+            value={tokenOut}
+            onChange={(e) => setTokenOut(e.target.value)}
+            className="input-field"
+            placeholder="Token address 0x..."
+            style={{ marginTop: '0.6rem', fontSize: '0.78rem', padding: '0.6rem 0.85rem' }}
+            id="input-token-out"
+          />
+        </div>
 
-          <div>
-            <label className="input-label">Deadline (Minutes)</label>
+        {/* Deadline */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.75rem 1.25rem',
+          background: 'rgba(255, 255, 255, 0.02)',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border-subtle)',
+        }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Deadline</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <input
               type="number"
               value={deadlineMinutes}
               onChange={(e) => setDeadlineMinutes(e.target.value)}
-              className="input-field"
+              style={{
+                width: '60px',
+                textAlign: 'right',
+                background: 'transparent',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                padding: '0.3rem 0.5rem',
+                borderRadius: '6px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                outline: 'none',
+              }}
+              id="input-deadline"
             />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>minutes</span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
           <button
             onClick={handleSignIntent}
             disabled={isSigning || isSubmitting}
             className="btn-primary"
-            style={{ flex: 1, justifyContent: 'center' }}
+            style={{ flex: 1 }}
+            id="btn-sign-intent"
           >
-            <Shield size={18} />
-            {isSigning ? 'Signing EIP-712...' : 'Step 1: Sign EIP-712 Intent'}
+            {isSigning ? (
+              <><Loader2 size={18} className="spin" /> Signing EIP-712...</>
+            ) : (
+              <><FileSignature size={18} /> Sign EIP-712 Intent</>
+            )}
           </button>
 
           {signedIntent && (
             <button
               onClick={handleSubmitIntent}
               disabled={isSubmitting}
-              className="btn-secondary"
-              style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--accent-emerald)', color: '#6ee7b7' }}
+              className="btn-primary"
+              style={{
+                flex: 1,
+                background: 'var(--gradient-emerald)',
+              }}
+              id="btn-submit-intent"
             >
-              <Send size={18} />
-              {isSubmitting ? 'Queueing...' : 'Step 2: Submit to Queue'}
+              {isSubmitting ? (
+                <><Loader2 size={18} className="spin" /> Queueing...</>
+              ) : (
+                <><Send size={18} /> Submit to Queue</>
+              )}
             </button>
           )}
         </div>
 
         {/* Signature Preview */}
         {signedIntent && (
-          <div style={{
-            background: 'rgba(139, 92, 246, 0.08)',
-            border: '1px solid rgba(139, 92, 246, 0.25)',
-            padding: '1rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.82rem'
-          }}>
-            <div style={{ fontWeight: 600, color: '#c4b5fd', marginBottom: '0.3rem' }}>
-              EIP-712 Signature Generated:
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all', color: 'var(--text-secondary)' }}>
-              {signedIntent.signature}
-            </div>
+          <div className="collapsible animate-in" style={{ marginTop: '0.5rem' }}>
+            <button
+              className="collapsible__trigger"
+              onClick={() => setShowSig(!showSig)}
+              id="btn-toggle-signature"
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileSignature size={16} style={{ color: 'var(--accent-purple)' }} />
+                EIP-712 Signature
+              </span>
+              {showSig ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+            {showSig && (
+              <div className="collapsible__content">
+                {signedIntent.signature}
+              </div>
+            )}
           </div>
         )}
 
         {/* Status Message */}
         {statusMsg.text && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.85rem',
-            background: statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : statusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 182, 212, 0.15)',
-            color: statusMsg.type === 'error' ? '#fca5a5' : statusMsg.type === 'success' ? '#6ee7b7' : '#67e8f9',
-            border: `1px solid ${statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.3)' : statusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(6, 182, 212, 0.3)'}`
-          }}>
+          <div className={`status-alert status-alert--${statusMsg.type}`}>
             {statusMsg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
             <span>{statusMsg.text}</span>
           </div>
         )}
-
       </div>
     </div>
   );
