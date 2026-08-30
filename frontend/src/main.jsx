@@ -5,7 +5,7 @@ import { sepolia } from 'viem/chains';
 import App from './App';
 import './index.css';
 
-const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'clp39o8jg00kpjy0f2b30m4c8';
+const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'cmtg90nk4018b0cjr3g10duec';
 
 function MainRoot() {
   return (
