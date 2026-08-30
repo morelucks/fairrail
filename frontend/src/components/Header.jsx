@@ -10,39 +10,21 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
 
-  // Generate a deterministic color from address for avatar
-  const getAvatarColor = (addr) => {
-    if (!addr) return 'var(--accent-purple)';
-    const hash = parseInt(addr.substring(2, 8), 16);
-    const hue = hash % 360;
-    return `hsl(${hue}, 65%, 55%)`;
-  };
-
   return (
     <header style={{
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      backdropFilter: 'blur(24px) saturate(1.3)',
-      WebkitBackdropFilter: 'blur(24px) saturate(1.3)',
-      background: 'rgba(6, 7, 18, 0.8)',
+      background: 'rgba(13, 16, 23, 0.95)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       borderBottom: '1px solid var(--border-color)',
       marginBottom: '1.5rem',
     }}>
-      {/* Animated gradient line at top */}
-      <div style={{
-        position: 'absolute',
-        bottom: -1,
-        left: 0,
-        right: 0,
-        height: '1px',
-        background: 'linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.5) 25%, rgba(236, 72, 153, 0.5) 50%, rgba(6, 182, 212, 0.5) 75%, transparent 100%)',
-      }} />
-
       <div style={{
         maxWidth: '1400px',
         margin: '0 auto',
-        padding: '0.85rem 1.5rem',
+        padding: '0.75rem 1.5rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -53,38 +35,37 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{
-            width: '42px',
-            height: '42px',
+            width: '36px',
+            height: '36px',
             borderRadius: 'var(--radius-sm)',
-            background: 'var(--gradient-brand)',
+            background: 'var(--accent-primary)',
+            color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.4rem',
-            boxShadow: '0 4px 20px rgba(139, 92, 246, 0.35)',
-            animation: 'pulseGlow 4s ease-in-out infinite',
+            fontSize: '1.2rem',
             flexShrink: 0,
           }}>
             🚆
           </div>
           <div>
             <h1 style={{
-              fontSize: '1.25rem',
-              fontWeight: 800,
+              fontSize: '1.15rem',
+              fontWeight: 700,
               letterSpacing: '-0.02em',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.6rem',
+              gap: '0.5rem',
               lineHeight: 1.2,
+              color: 'var(--text-primary)',
             }}>
-              <span className="gradient-text">FairRail</span>
-              <span className="badge badge-purple" style={{ fontSize: '0.6rem' }}>v4 Hook</span>
+              FairRail
+              <span className="badge badge-purple" style={{ fontSize: '0.62rem' }}>v4 Hook</span>
             </h1>
             <p style={{
               fontSize: '0.72rem',
               color: 'var(--text-muted)',
               marginTop: '1px',
-              letterSpacing: '0.02em',
             }}>
               Private Intent Matching & LP-Owned MEV Auctions
             </p>
@@ -105,7 +86,7 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
             className="chip"
             id="link-hook-contract"
           >
-            <Zap size={12} style={{ color: 'var(--accent-cyan)' }} />
+            <Zap size={12} style={{ color: 'var(--accent-primary-light)' }} />
             Hook: {truncateAddress(CONTRACT_ADDRESSES.FairRailHook)}
             <ExternalLink size={10} style={{ opacity: 0.5 }} />
           </a>
@@ -130,21 +111,17 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
             display: 'flex',
             alignItems: 'center',
             gap: '0.4rem',
-            fontSize: '0.78rem',
-            padding: '0.4rem 0.85rem',
+            fontSize: '0.75rem',
+            padding: '0.35rem 0.75rem',
             borderRadius: 'var(--radius-pill)',
-            background: 'rgba(255, 255, 255, 0.04)',
+            background: 'var(--bg-tertiary)',
             border: '1px solid var(--border-color)',
           }}>
             <span style={{
-              width: '7px',
-              height: '7px',
+              width: '6px',
+              height: '6px',
               borderRadius: '50%',
-              backgroundColor: isCorrectNetwork ? 'var(--accent-emerald)' : 'var(--accent-amber)',
-              boxShadow: isCorrectNetwork
-                ? '0 0 8px rgba(16, 185, 129, 0.5)'
-                : '0 0 8px rgba(245, 158, 11, 0.5)',
-              animation: 'pulseDot 2s ease-in-out infinite',
+              backgroundColor: isCorrectNetwork ? 'var(--status-emerald)' : 'var(--status-amber)',
             }} />
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
               {isCorrectNetwork ? 'Sepolia' : 'Wrong Network'}
@@ -157,48 +134,37 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.6rem',
-                background: 'rgba(139, 92, 246, 0.06)',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                padding: '0.4rem 0.85rem 0.4rem 0.5rem',
+                gap: '0.5rem',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                padding: '0.35rem 0.75rem',
                 borderRadius: 'var(--radius-pill)',
               }}>
-                {/* Address avatar */}
                 <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: `linear-gradient(135deg, ${getAvatarColor(account)}, ${getAvatarColor(account + '1')})`,
-                  border: '2px solid rgba(255, 255, 255, 0.15)',
-                  flexShrink: 0,
-                }} />
-                <div>
-                  <div style={{
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    fontFamily: 'var(--font-mono)',
-                    lineHeight: 1.2,
-                  }}>
-                    {truncateAddress(account)}
-                  </div>
-                  <div style={{
-                    fontSize: '0.7rem',
-                    color: 'var(--accent-cyan-light)',
-                    fontWeight: 500,
-                  }}>
-                    {parseFloat(balance).toFixed(4)} ETH
-                  </div>
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-primary)',
+                }}>
+                  {truncateAddress(account)}
+                </div>
+                <div style={{
+                  fontSize: '0.72rem',
+                  color: 'var(--accent-primary-light)',
+                  fontWeight: 500,
+                }}>
+                  {parseFloat(balance).toFixed(4)} ETH
                 </div>
               </div>
               {onLogout && (
                 <button
                   onClick={onLogout}
                   className="btn-icon"
-                  title="Disconnect Privy Wallet"
-                  style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-pill)' }}
+                  title="Disconnect Wallet"
+                  style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-pill)' }}
                   id="btn-disconnect-wallet"
                 >
-                  <LogOut size={14} />
+                  <LogOut size={13} />
                 </button>
               )}
             </div>
@@ -208,10 +174,10 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
               disabled={isConnecting}
               className="btn-primary"
               id="btn-connect-wallet"
-              style={{ padding: '0.55rem 1.15rem', fontSize: '0.85rem' }}
+              style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
             >
-              <Wallet size={16} />
-              {isConnecting ? 'Initializing...' : 'Connect Wallet (Privy)'}
+              <Wallet size={15} />
+              {isConnecting ? 'Initializing...' : 'Connect Wallet'}
             </button>
           )}
         </div>

@@ -71,14 +71,14 @@ export default function LpDashboard({ provider, signer, account }) {
   };
 
   return (
-    <div className="glass-card" style={{ padding: '2rem' }}>
+    <div className="glass-card" style={{ padding: '1.75rem' }}>
 
       {/* Section Header */}
       <div className="section-header">
         <div>
           <h2 className="section-header__title">
-            <div className="section-header__title-icon section-header__title-icon--emerald">
-              <TrendingUp size={20} />
+            <div className="section-header__title-icon">
+              <TrendingUp size={18} />
             </div>
             LP Yield & MEV Recapture Dashboard
           </h2>
@@ -89,59 +89,37 @@ export default function LpDashboard({ provider, signer, account }) {
         <button
           onClick={fetchMetrics}
           className="btn-secondary"
-          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+          style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
           id="btn-refresh-lp"
         >
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
       {/* Hero Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
         
         {/* Claimable Yield */}
-        <div className="stat-card stat-card--emerald animate-in" style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div className="stat-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <div className="stat-card__label" style={{ margin: 0 }}>Claimable Yield</div>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-xs)',
-              background: 'var(--accent-emerald-dim)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <DollarSign size={16} style={{ color: 'var(--accent-emerald)' }} />
-            </div>
+            <DollarSign size={16} style={{ color: 'var(--status-emerald)' }} />
           </div>
-          <div className="stat-card__value" style={{ color: 'var(--accent-emerald-light)' }}>
+          <div className="stat-card__value">
             {metrics.accruedAuctionLp}
           </div>
-          <div className="stat-card__sub" style={{ color: 'var(--accent-emerald)' }}>
+          <div className="stat-card__sub" style={{ color: 'var(--status-emerald)' }}>
             ETH — Ready to Withdraw
           </div>
         </div>
 
         {/* Total MEV Recaptured */}
-        <div className="stat-card stat-card--purple animate-in animate-in-delay-1">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div className="stat-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <div className="stat-card__label" style={{ margin: 0 }}>Total MEV Recaptured</div>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-xs)',
-              background: 'var(--accent-purple-dim)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <ShieldCheck size={16} style={{ color: 'var(--accent-purple)' }} />
-            </div>
+            <ShieldCheck size={16} style={{ color: 'var(--accent-primary-light)' }} />
           </div>
-          <div className="stat-card__value" style={{ color: 'var(--text-primary)' }}>
+          <div className="stat-card__value">
             {metrics.totalLpMev}
           </div>
           <div className="stat-card__sub">
@@ -150,22 +128,12 @@ export default function LpDashboard({ provider, signer, account }) {
         </div>
 
         {/* Off-Chain Matched Volume */}
-        <div className="stat-card stat-card--cyan animate-in animate-in-delay-2">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div className="stat-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <div className="stat-card__label" style={{ margin: 0 }}>Matched Volume</div>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-xs)',
-              background: 'var(--accent-cyan-dim)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <BarChart3 size={16} style={{ color: 'var(--accent-cyan)' }} />
-            </div>
+            <BarChart3 size={16} style={{ color: 'var(--text-secondary)' }} />
           </div>
-          <div className="stat-card__value" style={{ color: 'var(--accent-cyan-light)' }}>
+          <div className="stat-card__value">
             {metrics.matchedVolume}
           </div>
           <div className="stat-card__sub">
@@ -175,51 +143,52 @@ export default function LpDashboard({ provider, signer, account }) {
       </div>
 
       {/* Revenue Flow */}
-      <div style={{ marginBottom: '1.75rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <div style={{
-          fontSize: '0.78rem',
-          fontWeight: 700,
+          fontSize: '0.75rem',
+          fontWeight: 600,
           textTransform: 'uppercase',
-          letterSpacing: '0.08em',
+          letterSpacing: '0.05em',
           color: 'var(--text-muted)',
-          marginBottom: '0.75rem',
+          marginBottom: '0.65rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: '0.4rem',
         }}>
-          <Award size={14} style={{ color: 'var(--accent-emerald)' }} />
+          <Award size={13} />
           Revenue Distribution
         </div>
 
         <div className="revenue-flow">
-          <div style={{ textAlign: 'center', minWidth: '60px' }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald-light)' }}>80%</div>
+          <div style={{ textAlign: 'center', minWidth: '50px' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>80%</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>LP Pool</div>
           </div>
-          <div className="revenue-flow__bar" style={{ height: '16px' }}>
+          <div className="revenue-flow__bar" style={{ height: '10px' }}>
             <div className="revenue-flow__segment revenue-flow__segment--lp" />
             <div className="revenue-flow__segment revenue-flow__segment--protocol" />
           </div>
-          <div style={{ textAlign: 'center', minWidth: '60px' }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--accent-purple-light)' }}>20%</div>
+          <div style={{ textAlign: 'center', minWidth: '50px' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>20%</div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Protocol</div>
           </div>
         </div>
       </div>
 
-      <div className="divider divider--gradient" />
+      <div className="divider" />
 
       {/* Claim Form */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
         <div style={{
           fontSize: '0.85rem',
-          fontWeight: 700,
+          fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: '0.4rem',
+          color: 'var(--text-primary)',
         }}>
-          <ArrowDownToLine size={16} style={{ color: 'var(--accent-emerald)' }} />
+          <ArrowDownToLine size={15} />
           Claim LP Revenue
         </div>
 
@@ -231,7 +200,7 @@ export default function LpDashboard({ provider, signer, account }) {
             onChange={(e) => setPoolIdHex(e.target.value)}
             className="input-field"
             placeholder="0x..."
-            style={{ fontSize: '0.82rem' }}
+            style={{ fontSize: '0.8rem' }}
             id="input-pool-id-lp"
           />
         </div>
@@ -254,23 +223,22 @@ export default function LpDashboard({ provider, signer, account }) {
           className="btn-primary"
           style={{
             width: '100%',
-            background: 'var(--gradient-emerald)',
-            padding: '1rem',
-            fontSize: '0.95rem',
+            padding: '0.85rem',
+            fontSize: '0.9rem',
           }}
           id="btn-claim-lp-revenue"
         >
           {isClaiming ? (
-            <><Loader2 size={18} className="spin" /> Claiming ETH...</>
+            <><Loader2 size={16} className="spin" /> Claiming ETH...</>
           ) : (
-            <><DollarSign size={18} /> Claim {metrics.accruedAuctionLp} ETH LP Revenue</>
+            <><DollarSign size={16} /> Claim {metrics.accruedAuctionLp} ETH LP Revenue</>
           )}
         </button>
 
         {/* Status */}
         {statusMsg.text && (
           <div className={`status-alert status-alert--${statusMsg.type}`}>
-            {statusMsg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            {statusMsg.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
             <span>{statusMsg.text}</span>
           </div>
         )}

@@ -55,14 +55,14 @@ export default function IntentQueue({ provider, signer }) {
   };
 
   return (
-    <div className="glass-card" style={{ padding: '2rem' }}>
+    <div className="glass-card" style={{ padding: '1.75rem' }}>
       
       {/* Section Header */}
       <div className="section-header">
         <div>
           <h2 className="section-header__title">
-            <div className="section-header__title-icon section-header__title-icon--cyan">
-              <Layers size={20} />
+            <div className="section-header__title-icon">
+              <Layers size={18} />
             </div>
             Pending Intent Queue
           </h2>
@@ -74,40 +74,40 @@ export default function IntentQueue({ provider, signer }) {
           onClick={fetchQueueCount}
           disabled={isLoading}
           className="btn-secondary"
-          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+          style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
           id="btn-refresh-queue"
         >
-          <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
+          <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
           Refresh
         </button>
       </div>
 
       {/* Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
         
-        <div className="stat-card stat-card--cyan animate-in">
+        <div className="stat-card">
           <div className="stat-card__label">Queue Length</div>
-          <div className="stat-card__value" style={{ color: 'var(--accent-cyan-light)' }}>
+          <div className="stat-card__value">
             {pendingCount}
           </div>
           <div className="stat-card__sub">Active Pending Intents</div>
         </div>
 
-        <div className="stat-card stat-card--emerald animate-in animate-in-delay-1">
+        <div className="stat-card">
           <div className="stat-card__label">Hook Routing</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', marginBottom: '0.35rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem', marginBottom: '0.2rem' }}>
             <span className="badge badge-live">Active</span>
           </div>
           <div className="stat-card__sub" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
-            beforeSwap() intercept
+            beforeSwap() Intercept
           </div>
         </div>
 
-        <div className="stat-card stat-card--purple animate-in animate-in-delay-2">
+        <div className="stat-card">
           <div className="stat-card__label">Match Engine</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem', marginBottom: '0.35rem' }}>
-            <Zap size={18} style={{ color: 'var(--accent-purple-light)' }} />
-            <span style={{ fontWeight: 700, color: 'var(--accent-purple-light)', fontSize: '0.95rem' }}>P2P + Batch</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem', marginBottom: '0.2rem' }}>
+            <Zap size={16} style={{ color: 'var(--accent-primary-light)' }} />
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>P2P + Batch</span>
           </div>
           <div className="stat-card__sub">Net Delta Offset</div>
         </div>
@@ -117,39 +117,39 @@ export default function IntentQueue({ provider, signer }) {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem',
-        padding: '1rem 1.25rem',
+        gap: '0.4rem',
+        padding: '0.85rem 1rem',
         borderRadius: 'var(--radius-sm)',
-        background: 'rgba(255, 255, 255, 0.02)',
+        background: 'var(--bg-secondary)',
         border: '1px solid var(--border-color)',
         marginBottom: '1.25rem',
         overflow: 'auto',
       }}>
         {[
-          { label: 'Signed Intent', color: 'var(--accent-purple)', bg: 'var(--accent-purple-dim)' },
-          { label: 'Queue Pool', color: 'var(--accent-cyan)', bg: 'var(--accent-cyan-dim)' },
-          { label: 'Counter-Match', color: 'var(--accent-emerald)', bg: 'var(--accent-emerald-dim)' },
-          { label: 'Settle or AMM', color: 'var(--accent-pink)', bg: 'var(--accent-pink-dim)' },
+          { label: 'Signed Intent' },
+          { label: 'Queue Pool' },
+          { label: 'Counter-Match' },
+          { label: 'Settle / AMM' },
         ].map((step, i, arr) => (
           <React.Fragment key={step.label}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              padding: '0.4rem 0.75rem',
+              padding: '0.35rem 0.65rem',
               borderRadius: 'var(--radius-xs)',
-              background: step.bg,
-              border: `1px solid ${step.color}22`,
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
               fontSize: '0.75rem',
-              fontWeight: 600,
-              color: step.color,
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
               whiteSpace: 'nowrap',
             }}>
               <Activity size={12} />
               {step.label}
             </div>
             {i < arr.length - 1 && (
-              <ArrowRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0, opacity: 0.5 }} />
+              <ArrowRight size={13} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
             )}
           </React.Fragment>
         ))}
@@ -159,16 +159,16 @@ export default function IntentQueue({ provider, signer }) {
       <div className="collapsible">
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justify: 'space-between',
           alignItems: 'center',
-          padding: '1rem 1.25rem',
+          padding: '0.85rem 1rem',
         }}>
           <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-cyan-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Trash2 size={16} />
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Trash2 size={15} />
               Queue Compaction
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
               Compact array storage by purging zeroed-out or expired intents.
             </div>
           </div>
@@ -176,13 +176,13 @@ export default function IntentQueue({ provider, signer }) {
             onClick={handleCleanup}
             disabled={isCleaning}
             className="btn-secondary"
-            style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+            style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
             id="btn-compact-queue"
           >
             {isCleaning ? (
-              <><Loader2 size={14} className="spin" /> Cleaning...</>
+              <><Loader2 size={13} className="spin" /> Cleaning...</>
             ) : (
-              <><Trash2 size={14} /> Compact</>
+              <><Trash2 size={13} /> Compact</>
             )}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function IntentQueue({ provider, signer }) {
       {/* Status */}
       {statusMsg && (
         <div className="status-alert status-alert--info" style={{ marginTop: '1rem' }}>
-          <CheckCircle2 size={16} />
+          <CheckCircle2 size={15} />
           <span>{statusMsg}</span>
         </div>
       )}

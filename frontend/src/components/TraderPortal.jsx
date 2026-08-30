@@ -135,51 +135,50 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
   const currentStep = signedIntent ? 2 : 1;
 
   return (
-    <div className="glass-card" style={{ padding: '2rem' }}>
+    <div className="glass-card" style={{ padding: '1.75rem' }}>
 
       {/* Section Header */}
       <div className="section-header">
         <div>
           <h2 className="section-header__title">
-            <div className="section-header__title-icon section-header__title-icon--purple">
-              <Shield size={20} />
+            <div className="section-header__title-icon">
+              <Shield size={18} />
             </div>
             Private Intent Matcher
           </h2>
           <p className="section-header__desc">
-            Trade off-chain with EIP-712 signatures. Zero slippage, zero AMM price impact, zero MEV exposure.
+            Trade off-chain via signed EIP-712 intents. Counter-flow matches off-chain prior to AMM routing.
           </p>
         </div>
-        <span className="badge badge-emerald">0% Slippage</span>
+        <span className="badge badge-emerald">0% Slippage Protection</span>
       </div>
 
       {/* Step Progress */}
       <div className="step-progress">
         <div className={`step-progress__step ${currentStep === 1 ? 'step-progress__step--active' : ''} ${signedIntent ? 'step-progress__step--done' : ''}`}>
           <div className="step-progress__num">
-            {signedIntent ? <CheckCircle2 size={14} /> : '1'}
+            {signedIntent ? <CheckCircle2 size={13} /> : '1'}
           </div>
           <span>Sign Intent</span>
         </div>
-        <div className="step-progress__connector" style={signedIntent ? { background: 'var(--accent-emerald)' } : {}} />
+        <div className={`step-progress__connector ${signedIntent ? 'step-progress__connector--done' : ''}`} />
         <div className={`step-progress__step ${currentStep === 2 ? 'step-progress__step--active' : ''}`}>
           <div className="step-progress__num">2</div>
           <span>Submit to Queue</span>
         </div>
       </div>
 
-      {/* Swap Card */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {/* Swap Form */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
 
         {/* Token In */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: 'var(--bg-secondary)',
           border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-md)',
-          padding: '1.15rem 1.25rem',
-          transition: 'all 0.3s ease',
+          padding: '1rem 1.15rem',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
             <label className="input-label" style={{ margin: 0, fontSize: '0.75rem' }}>You Sell</label>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Token In</span>
           </div>
@@ -194,14 +193,14 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
               id="input-amount-in"
             />
             <div style={{
-              padding: '0.5rem 0.85rem',
+              padding: '0.4rem 0.75rem',
               borderRadius: 'var(--radius-sm)',
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
               fontSize: '0.78rem',
               fontWeight: 600,
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-purple-light)',
+              color: 'var(--text-primary)',
               whiteSpace: 'nowrap',
               maxWidth: '160px',
               overflow: 'hidden',
@@ -216,40 +215,39 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
             onChange={(e) => setTokenIn(e.target.value)}
             className="input-field"
             placeholder="Token address 0x..."
-            style={{ marginTop: '0.6rem', fontSize: '0.78rem', padding: '0.6rem 0.85rem' }}
+            style={{ marginTop: '0.5rem', fontSize: '0.78rem', padding: '0.55rem 0.75rem' }}
             id="input-token-in"
           />
         </div>
 
         {/* Swap Button */}
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.5rem 0', zIndex: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '-0.4rem 0', zIndex: 2 }}>
           <button
             onClick={handleSwapTokens}
             className="btn-icon"
             title="Swap tokens"
             id="btn-swap-tokens"
             style={{
-              background: 'var(--bg-secondary)',
-              border: '3px solid var(--bg-void)',
-              borderRadius: '12px',
-              width: '40px',
-              height: '40px',
+              background: 'var(--bg-tertiary)',
+              border: '2px solid var(--bg-card)',
+              borderRadius: '50%',
+              width: '34px',
+              height: '34px',
             }}
           >
-            <ArrowDownUp size={16} />
+            <ArrowDownUp size={14} />
           </button>
         </div>
 
         {/* Token Out */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: 'var(--bg-secondary)',
           border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-md)',
-          padding: '1.15rem 1.25rem',
-          transition: 'all 0.3s ease',
+          padding: '1rem 1.15rem',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-            <label className="input-label" style={{ margin: 0, fontSize: '0.75rem' }}>You Buy</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <label className="input-label" style={{ margin: 0, fontSize: '0.75rem' }}>You Buy (Min Output)</label>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Token Out</span>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -263,14 +261,14 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
               id="input-min-amount-out"
             />
             <div style={{
-              padding: '0.5rem 0.85rem',
+              padding: '0.4rem 0.75rem',
               borderRadius: 'var(--radius-sm)',
-              background: 'rgba(6, 182, 212, 0.1)',
-              border: '1px solid rgba(6, 182, 212, 0.2)',
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
               fontSize: '0.78rem',
               fontWeight: 600,
               fontFamily: 'var(--font-mono)',
-              color: 'var(--accent-cyan-light)',
+              color: 'var(--text-primary)',
               whiteSpace: 'nowrap',
               maxWidth: '160px',
               overflow: 'hidden',
@@ -285,7 +283,7 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
             onChange={(e) => setTokenOut(e.target.value)}
             className="input-field"
             placeholder="Token address 0x..."
-            style={{ marginTop: '0.6rem', fontSize: '0.78rem', padding: '0.6rem 0.85rem' }}
+            style={{ marginTop: '0.5rem', fontSize: '0.78rem', padding: '0.55rem 0.75rem' }}
             id="input-token-out"
           />
         </div>
@@ -295,33 +293,33 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.75rem 1.25rem',
-          background: 'rgba(255, 255, 255, 0.02)',
+          padding: '0.65rem 1rem',
+          background: 'var(--bg-secondary)',
           borderRadius: 'var(--radius-sm)',
           border: '1px solid var(--border-subtle)',
+          marginTop: '0.2rem',
         }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Deadline</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Intent Expiry Deadline</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <input
               type="number"
               value={deadlineMinutes}
               onChange={(e) => setDeadlineMinutes(e.target.value)}
               style={{
-                width: '60px',
+                width: '55px',
                 textAlign: 'right',
-                background: 'transparent',
+                background: 'var(--bg-input)',
                 border: '1px solid var(--border-color)',
                 color: 'var(--text-primary)',
-                padding: '0.3rem 0.5rem',
-                borderRadius: '6px',
+                padding: '0.25rem 0.4rem',
+                borderRadius: '4px',
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
+                fontSize: '0.82rem',
                 outline: 'none',
               }}
               id="input-deadline"
             />
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>minutes</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>mins</span>
           </div>
         </div>
 
@@ -335,9 +333,9 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
             id="btn-sign-intent"
           >
             {isSigning ? (
-              <><Loader2 size={18} className="spin" /> Signing EIP-712...</>
+              <><Loader2 size={16} className="spin" /> Signing EIP-712...</>
             ) : (
-              <><FileSignature size={18} /> Sign EIP-712 Intent</>
+              <><FileSignature size={16} /> Sign EIP-712 Intent</>
             )}
           </button>
 
@@ -348,14 +346,14 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
               className="btn-primary"
               style={{
                 flex: 1,
-                background: 'var(--gradient-emerald)',
+                background: 'var(--status-emerald)',
               }}
               id="btn-submit-intent"
             >
               {isSubmitting ? (
-                <><Loader2 size={18} className="spin" /> Queueing...</>
+                <><Loader2 size={16} className="spin" /> Queueing...</>
               ) : (
-                <><Send size={18} /> Submit to Queue</>
+                <><Send size={16} /> Submit to Queue</>
               )}
             </button>
           )}
@@ -363,17 +361,17 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
 
         {/* Signature Preview */}
         {signedIntent && (
-          <div className="collapsible animate-in" style={{ marginTop: '0.5rem' }}>
+          <div className="collapsible" style={{ marginTop: '0.5rem' }}>
             <button
               className="collapsible__trigger"
               onClick={() => setShowSig(!showSig)}
               id="btn-toggle-signature"
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileSignature size={16} style={{ color: 'var(--accent-purple)' }} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <FileSignature size={15} style={{ color: 'var(--accent-primary-light)' }} />
                 EIP-712 Signature
               </span>
-              {showSig ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showSig ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
             {showSig && (
               <div className="collapsible__content">
@@ -385,8 +383,8 @@ export default function TraderPortal({ signer, account, onIntentSubmitted }) {
 
         {/* Status Message */}
         {statusMsg.text && (
-          <div className={`status-alert status-alert--${statusMsg.type}`}>
-            {statusMsg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+          <div className={`status-alert status-alert--${statusMsg.type}`} style={{ marginTop: '0.5rem' }}>
+            {statusMsg.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
             <span>{statusMsg.text}</span>
           </div>
         )}

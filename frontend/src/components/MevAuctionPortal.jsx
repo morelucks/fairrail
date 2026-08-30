@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { Gavel, DollarSign, Clock, RefreshCw, AlertCircle, CheckCircle2, Trophy, Loader2, Flame, ArrowDownToLine } from 'lucide-react';
+import { Gavel, DollarSign, RefreshCw, AlertCircle, CheckCircle2, Trophy, Loader2, Flame, ArrowDownToLine } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG, MEV_AUCTION_ABI } from '../config/contracts';
 
 export default function MevAuctionPortal({ provider, signer, account }) {
@@ -96,53 +96,53 @@ export default function MevAuctionPortal({ provider, signer, account }) {
   const hasActiveBid = highestBid.searcher && highestBid.searcher !== '0x0000000000000000000000000000000000000000';
 
   return (
-    <div className="glass-card" style={{ padding: '2rem' }}>
+    <div className="glass-card" style={{ padding: '1.75rem' }}>
 
       {/* Section Header */}
       <div className="section-header">
         <div>
           <h2 className="section-header__title">
-            <div className="section-header__title-icon section-header__title-icon--pink">
-              <Gavel size={20} />
+            <div className="section-header__title-icon">
+              <Gavel size={18} />
             </div>
             Searcher MEV & LVR Auction
           </h2>
           <p className="section-header__desc">
-            Searchers bid for block backrunning rights. 80% of winning proceeds are distributed to LPs via <code style={{ color: 'var(--accent-pink-light)', fontSize: '0.82rem' }}>afterSwap()</code>.
+            Searchers bid for block backrunning rights. 80% of proceeds credit directly to pool LPs via <code style={{ color: 'var(--text-primary)', fontSize: '0.8rem' }}>afterSwap()</code>.
           </p>
         </div>
         <button
           onClick={fetchAuctionState}
           className="btn-secondary"
-          style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+          style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
           id="btn-refresh-auction"
         >
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
-      {/* Bid Submission Card */}
+      {/* Bid Submission Form */}
       <div style={{
-        background: 'rgba(236, 72, 153, 0.04)',
-        border: '1px solid rgba(236, 72, 153, 0.15)',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
         borderRadius: 'var(--radius-md)',
-        padding: '1.5rem',
+        padding: '1.25rem',
         marginBottom: '1.5rem',
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '1rem',
+          gap: '0.4rem',
+          marginBottom: '0.85rem',
           fontSize: '0.85rem',
           fontWeight: 600,
-          color: 'var(--accent-pink-light)',
+          color: 'var(--text-primary)',
         }}>
-          <Flame size={16} />
+          <Flame size={15} style={{ color: 'var(--accent-pink)' }} />
           Place Backrunning Bid
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '0.85rem' }}>
           <label className="input-label">Pool ID (Bytes32)</label>
           <input
             type="text"
@@ -150,7 +150,7 @@ export default function MevAuctionPortal({ provider, signer, account }) {
             onChange={(e) => setPoolIdHex(e.target.value)}
             className="input-field"
             placeholder="0x..."
-            style={{ fontSize: '0.82rem' }}
+            style={{ fontSize: '0.8rem' }}
             id="input-pool-id-auction"
           />
         </div>
@@ -165,10 +165,10 @@ export default function MevAuctionPortal({ provider, signer, account }) {
                 value={bidAmountEth}
                 onChange={(e) => setBidAmountEth(e.target.value)}
                 className="input-field"
-                style={{ paddingRight: '3.5rem', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '1.1rem' }}
+                style={{ paddingRight: '3.5rem', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '1rem' }}
                 id="input-bid-amount"
               />
-              <span className="input-group__suffix" style={{ color: 'var(--accent-pink-light)' }}>ETH</span>
+              <span className="input-group__suffix">ETH</span>
             </div>
           </div>
 
@@ -177,16 +177,15 @@ export default function MevAuctionPortal({ provider, signer, account }) {
             disabled={isSubmitting}
             className="btn-primary"
             style={{
-              background: 'var(--gradient-pink)',
-              padding: '0.85rem 1.5rem',
+              padding: '0.75rem 1.25rem',
               whiteSpace: 'nowrap',
             }}
             id="btn-submit-bid"
           >
             {isSubmitting ? (
-              <><Loader2 size={18} className="spin" /> Bidding...</>
+              <><Loader2 size={16} className="spin" /> Bidding...</>
             ) : (
-              <><Gavel size={18} /> Submit Bid</>
+              <><Gavel size={16} /> Submit Bid</>
             )}
           </button>
         </div>
@@ -195,17 +194,17 @@ export default function MevAuctionPortal({ provider, signer, account }) {
       {/* Leaderboard */}
       <div style={{ marginBottom: '1.25rem' }}>
         <div style={{
-          fontSize: '0.78rem',
-          fontWeight: 700,
+          fontSize: '0.75rem',
+          fontWeight: 600,
           textTransform: 'uppercase',
-          letterSpacing: '0.08em',
+          letterSpacing: '0.05em',
           color: 'var(--text-muted)',
-          marginBottom: '0.75rem',
+          marginBottom: '0.65rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: '0.4rem',
         }}>
-          <Trophy size={14} style={{ color: 'var(--accent-amber)' }} />
+          <Trophy size={13} style={{ color: 'var(--status-amber)' }} />
           Current Block Leaderboard
         </div>
 
@@ -228,28 +227,28 @@ export default function MevAuctionPortal({ provider, signer, account }) {
                 alignItems: 'center',
                 gap: '0.3rem',
               }}>
-                <Trophy size={16} />
+                <Trophy size={14} />
                 #1
               </div>
               <div style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.85rem',
                 fontWeight: 600,
+                color: 'var(--text-primary)',
               }}>
                 {truncateAddr(highestBid.searcher)}
               </div>
               <div style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '1.05rem',
-                fontWeight: 800,
-                color: 'var(--accent-pink-light)',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
               }}>
                 {highestBid.amount} ETH
               </div>
               <div style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
+                fontSize: '0.82rem',
                 color: 'var(--text-secondary)',
               }}>
                 #{highestBid.blockNumber}
@@ -257,7 +256,7 @@ export default function MevAuctionPortal({ provider, signer, account }) {
             </div>
           ) : (
             <div className="leaderboard__row" style={{ justifyContent: 'center', gridTemplateColumns: '1fr' }}>
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', padding: '0.4rem 0' }}>
                 No bids yet for this pool. Be the first searcher to bid.
               </div>
             </div>
@@ -267,39 +266,39 @@ export default function MevAuctionPortal({ provider, signer, account }) {
 
       {/* Revenue Split Visual */}
       <div className="revenue-flow" style={{ marginBottom: '1.25rem' }}>
-        <div className="revenue-flow__label" style={{ color: 'var(--accent-emerald-light)' }}>LP 80%</div>
+        <div className="revenue-flow__label" style={{ color: 'var(--text-primary)' }}>80% LP Pool</div>
         <div className="revenue-flow__bar">
           <div className="revenue-flow__segment revenue-flow__segment--lp" />
           <div className="revenue-flow__segment revenue-flow__segment--protocol" />
         </div>
-        <div className="revenue-flow__label" style={{ color: 'var(--accent-purple-light)' }}>Protocol 20%</div>
+        <div className="revenue-flow__label" style={{ color: 'var(--text-muted)' }}>20% Protocol</div>
       </div>
 
       {/* Refund Section */}
       {parseFloat(pendingRefund) > 0 && (
-        <div className="animate-in" style={{
+        <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justify: 'space-between',
           alignItems: 'center',
-          background: 'var(--accent-amber-dim)',
+          background: 'var(--status-amber-dim)',
           border: '1px solid rgba(245, 158, 11, 0.2)',
-          padding: '1rem 1.25rem',
+          padding: '0.85rem 1rem',
           borderRadius: 'var(--radius-sm)',
           marginBottom: '1rem',
         }}>
           <div>
             <div style={{
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              color: 'var(--accent-amber-light)',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              color: 'var(--status-amber)',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.4rem',
             }}>
-              <DollarSign size={16} />
+              <DollarSign size={15} />
               Pending Outbid Refund: {pendingRefund} ETH
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
               Pull pattern — withdraw your refunded ETH bid safely.
             </div>
           </div>
@@ -309,15 +308,16 @@ export default function MevAuctionPortal({ provider, signer, account }) {
             className="btn-secondary"
             style={{
               borderColor: 'rgba(245, 158, 11, 0.3)',
-              color: 'var(--accent-amber-light)',
-              fontSize: '0.82rem',
+              color: 'var(--status-amber)',
+              fontSize: '0.8rem',
+              padding: '0.4rem 0.85rem',
             }}
             id="btn-withdraw-refund"
           >
             {isWithdrawing ? (
-              <><Loader2 size={14} className="spin" /> Withdrawing...</>
+              <><Loader2 size={13} className="spin" /> Withdrawing...</>
             ) : (
-              <><ArrowDownToLine size={14} /> Withdraw</>
+              <><ArrowDownToLine size={13} /> Withdraw</>
             )}
           </button>
         </div>
@@ -326,7 +326,7 @@ export default function MevAuctionPortal({ provider, signer, account }) {
       {/* Status */}
       {statusMsg.text && (
         <div className={`status-alert status-alert--${statusMsg.type}`}>
-          {statusMsg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+          {statusMsg.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
           <span>{statusMsg.text}</span>
         </div>
       )}
