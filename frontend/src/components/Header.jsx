@@ -1,9 +1,9 @@
 import React from 'react';
-import { Wallet, ExternalLink, Zap } from 'lucide-react';
+import { Wallet, ExternalLink, Zap, LogOut } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG } from '../config/contracts';
 
-export default function Header({ account, balance, isConnecting, onConnect, chainId }) {
-  const isCorrectNetwork = chainId === CHAIN_CONFIG.chainIdDecimal;
+export default function Header({ account, balance, isConnecting, onConnect, onLogout, chainId }) {
+  const isCorrectNetwork = !account || chainId === CHAIN_CONFIG.chainIdDecimal;
 
   const truncateAddress = (addr) => {
     if (!addr) return '';
@@ -153,41 +153,54 @@ export default function Header({ account, balance, isConnecting, onConnect, chai
 
           {/* Wallet */}
           {account ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              background: 'rgba(139, 92, 246, 0.06)',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
-              padding: '0.4rem 0.85rem 0.4rem 0.5rem',
-              borderRadius: 'var(--radius-pill)',
-            }}>
-              {/* Address avatar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: `linear-gradient(135deg, ${getAvatarColor(account)}, ${getAvatarColor(account + '1')})`,
-                border: '2px solid rgba(255, 255, 255, 0.15)',
-                flexShrink: 0,
-              }} />
-              <div>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: 'rgba(139, 92, 246, 0.06)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                padding: '0.4rem 0.85rem 0.4rem 0.5rem',
+                borderRadius: 'var(--radius-pill)',
+              }}>
+                {/* Address avatar */}
                 <div style={{
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
-                  lineHeight: 1.2,
-                }}>
-                  {truncateAddress(account)}
-                </div>
-                <div style={{
-                  fontSize: '0.7rem',
-                  color: 'var(--accent-cyan-light)',
-                  fontWeight: 500,
-                }}>
-                  {parseFloat(balance).toFixed(4)} ETH
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${getAvatarColor(account)}, ${getAvatarColor(account + '1')})`,
+                  border: '2px solid rgba(255, 255, 255, 0.15)',
+                  flexShrink: 0,
+                }} />
+                <div>
+                  <div style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-mono)',
+                    lineHeight: 1.2,
+                  }}>
+                    {truncateAddress(account)}
+                  </div>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--accent-cyan-light)',
+                    fontWeight: 500,
+                  }}>
+                    {parseFloat(balance).toFixed(4)} ETH
+                  </div>
                 </div>
               </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="btn-icon"
+                  title="Disconnect Privy Wallet"
+                  style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-pill)' }}
+                  id="btn-disconnect-wallet"
+                >
+                  <LogOut size={14} />
+                </button>
+              )}
             </div>
           ) : (
             <button
@@ -198,7 +211,7 @@ export default function Header({ account, balance, isConnecting, onConnect, chai
               style={{ padding: '0.55rem 1.15rem', fontSize: '0.85rem' }}
             >
               <Wallet size={16} />
-              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+              {isConnecting ? 'Initializing...' : 'Connect Wallet (Privy)'}
             </button>
           )}
         </div>

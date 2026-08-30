@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import Header from './components/Header';
 import TraderPortal from './components/TraderPortal';
 import IntentQueue from './components/IntentQueue';
@@ -48,60 +49,63 @@ const PIPELINE_STEPS = [
 ];
 
 export default function App() {
+  const { login, logout, authenticated, ready } = usePrivy();
+  const { wallets } = useWallets();
+
   const [account, setAccount] = useState('');
   const [balance, setBalance] = useState('0');
   const [chainId, setChainId] = useState(null);
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState('trader');
 
-  // Connect Wallet Handler
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert('Please install MetaMask or another EVM wallet to interact with FairRail.');
-      return;
-    }
+  const activeWallet = wallets && wallets.length > 0 ? wallets[0] : null;
 
-    try {
-      setIsConnecting(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await browserProvider.send('eth_requestAccounts', []);
-      const userSigner = await browserProvider.getSigner();
-      const network = await browserProvider.getNetwork();
-
-      const userAccount = accounts[0];
-      const userBalanceWei = await browserProvider.getBalance(userAccount);
-
-      setProvider(browserProvider);
-      setSigner(userSigner);
-      setAccount(userAccount);
-      setBalance(ethers.formatEther(userBalanceWei));
-      setChainId(Number(network.chainId));
-    } catch (err) {
-      console.error('Wallet connection failed:', err);
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  // EIP-1193 Account & Network Event Listeners
+  // Sync Privy connected wallet with ethers Provider & Signer
   useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', (accounts) => {
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-        } else {
-          setAccount('');
-          setSigner(null);
-        }
-      });
+    async function initPrivyWallet() {
+      if (activeWallet) {
+        try {
+          const eip1193Provider = await activeWallet.getEthereumProvider();
+          const browserProvider = new ethers.BrowserProvider(eip1193Provider);
+          const userSigner = await browserProvider.getSigner();
+          const userAccount = activeWallet.address;
+          const userBalanceWei = await browserProvider.getBalance(userAccount);
 
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload();
-      });
+          setProvider(browserProvider);
+          setSigner(userSigner);
+          setAccount(userAccount);
+          setBalance(ethers.formatEther(userBalanceWei));
+
+          let parsedChainId = CHAIN_CONFIG.chainIdDecimal;
+          if (activeWallet.chainId) {
+            const rawChain = activeWallet.chainId;
+            if (typeof rawChain === 'string' && rawChain.startsWith('eip155:')) {
+              parsedChainId = parseInt(rawChain.split(':')[1], 10);
+            } else if (typeof rawChain === 'string' && rawChain.startsWith('0x')) {
+              parsedChainId = parseInt(rawChain, 16);
+            } else {
+              parsedChainId = Number(rawChain);
+            }
+          } else {
+            const network = await browserProvider.getNetwork();
+            parsedChainId = Number(network.chainId);
+          }
+          setChainId(parsedChainId);
+        } catch (err) {
+          console.error('Failed to initialize Privy wallet provider:', err);
+        }
+      } else {
+        setAccount('');
+        setBalance('0');
+        setProvider(null);
+        setSigner(null);
+        setChainId(null);
+      }
     }
-  }, []);
+
+    initPrivyWallet();
+  }, [activeWallet]);
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -120,8 +124,9 @@ export default function App() {
         <Header
           account={account}
           balance={balance}
-          isConnecting={isConnecting}
-          onConnect={connectWallet}
+          isConnecting={!ready}
+          onConnect={login}
+          onLogout={logout}
           chainId={chainId}
         />
 
@@ -192,6 +197,7 @@ export default function App() {
                 marginBottom: '0.5rem',
               }}>
                 <span className="badge badge-live">Sepolia Live</span>
+                <span className="badge badge-purple" style={{ fontSize: '0.65rem' }}>Privy Powered</span>
               </div>
               <p style={{
                 fontSize: '0.72rem',
