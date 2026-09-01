@@ -62,13 +62,11 @@ const NAV_ITEMS = [
   },
 ];
 
-const PIPELINE_STEPS = [
-  { key: 'overview', label: '0. Protocol Overview', icon: '✨' },
-  { key: 'trader', label: '1. Private Intent', icon: '📝' },
-  { key: 'queue', label: '2. Batch Match', icon: '🔗' },
-  { key: 'keeper', label: '3. Chainlink DON', icon: '🤖' },
-  { key: 'auction', label: '4. MEV Auction', icon: '🔨' },
-  { key: 'lp', label: '5. LP Yield', icon: '💰' },
+// 3 Main Nav Items shown on Landing Page when disconnected
+const DISCONNECTED_NAV_ITEMS = [
+  NAV_ITEMS[0], // Protocol Overview
+  NAV_ITEMS[3], // Chainlink Keeper
+  NAV_ITEMS[5], // LP Dashboard
 ];
 
 export default function App() {
@@ -300,6 +298,8 @@ export default function App() {
     }
   }, [account]);
 
+  const visibleNavItems = account ? NAV_ITEMS : DISCONNECTED_NAV_ITEMS;
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
 
@@ -319,8 +319,14 @@ export default function App() {
           chainId={chainId}
           onSwitchNetwork={handleSwitchNetwork}
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          navItems={NAV_ITEMS}
+          onSelectTab={(tabKey) => {
+            if (!account && (tabKey === 'trader' || tabKey === 'queue' || tabKey === 'auction')) {
+              handleConnectWallet();
+            } else {
+              setActiveTab(tabKey);
+            }
+          }}
+          navItems={visibleNavItems}
         />
 
         {/* Main Content Area (Full Width, single navigation via Header) */}
@@ -332,8 +338,20 @@ export default function App() {
           <main style={{ width: '100%' }} className="animate-in">
             {activeTab === 'overview' && (
               <LandingHero
-                onLaunchApp={() => setActiveTab('trader')}
-                onSelectTab={(tab) => setActiveTab(tab)}
+                onLaunchApp={() => {
+                  if (!account) {
+                    handleConnectWallet();
+                  } else {
+                    setActiveTab('trader');
+                  }
+                }}
+                onSelectTab={(tab) => {
+                  if (!account && (tab === 'trader' || tab === 'queue' || tab === 'auction')) {
+                    handleConnectWallet();
+                  } else {
+                    setActiveTab(tab);
+                  }
+                }}
               />
             )}
 
