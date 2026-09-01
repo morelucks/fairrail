@@ -11,15 +11,7 @@ import KeeperPanel from './components/KeeperPanel';
 import { CHAIN_CONFIG } from './config/contracts';
 import { Shield, Gavel, TrendingUp, Layers, ChevronRight, Zap, ArrowRight, Github, Bot, Sparkles } from 'lucide-react';
 
-const NAV_ITEMS = [
-  {
-    key: 'overview',
-    label: 'Protocol Overview',
-    sub: 'Hero Landing Page',
-    icon: Sparkles,
-    accentColor: 'var(--accent-primary-light)',
-    badge: 'UHI10 Hero',
-  },
+const FEATURE_NAV_ITEMS = [
   {
     key: 'trader',
     label: 'Trader Portal',
@@ -62,11 +54,11 @@ const NAV_ITEMS = [
   },
 ];
 
-// 3 Main Nav Items shown on Landing Page when disconnected
+// 3 Public Nav Items shown on Landing Page when disconnected
 const DISCONNECTED_NAV_ITEMS = [
-  NAV_ITEMS[0], // Protocol Overview
-  NAV_ITEMS[3], // Chainlink Keeper
-  NAV_ITEMS[5], // LP Dashboard
+  FEATURE_NAV_ITEMS[2], // Chainlink Keeper
+  FEATURE_NAV_ITEMS[3], // MEV Auction
+  FEATURE_NAV_ITEMS[4], // LP Dashboard
 ];
 
 export default function App() {
@@ -298,7 +290,7 @@ export default function App() {
     }
   }, [account]);
 
-  const visibleNavItems = account ? NAV_ITEMS : DISCONNECTED_NAV_ITEMS;
+  const visibleNavItems = account ? FEATURE_NAV_ITEMS : DISCONNECTED_NAV_ITEMS;
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
