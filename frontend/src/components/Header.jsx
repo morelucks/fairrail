@@ -2,7 +2,7 @@ import React from 'react';
 import { Wallet, ExternalLink, Zap, LogOut } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG } from '../config/contracts';
 
-export default function Header({ account, balance, isConnecting, onConnect, onLogout, chainId }) {
+export default function Header({ account, balance, isConnecting, onConnect, onLogout, chainId, onSwitchNetwork }) {
   const isCorrectNetwork = !account || chainId === CHAIN_CONFIG.chainIdDecimal;
 
   const truncateAddress = (addr) => {
@@ -107,26 +107,34 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
 
           {/* Network Status */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: '0.75rem',
-            padding: '0.35rem 0.75rem',
-            borderRadius: 'var(--radius-pill)',
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border-color)',
-          }}>
+          <button
+            onClick={!isCorrectNetwork ? onSwitchNetwork : undefined}
+            title={!isCorrectNetwork ? 'Click to switch to Ethereum Sepolia' : 'Connected to Sepolia'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.75rem',
+              padding: '0.35rem 0.75rem',
+              borderRadius: 'var(--radius-pill)',
+              background: !isCorrectNetwork ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-tertiary)',
+              border: !isCorrectNetwork ? '1px solid var(--status-amber)' : '1px solid var(--border-color)',
+              color: !isCorrectNetwork ? 'var(--status-amber)' : 'var(--text-secondary)',
+              cursor: !isCorrectNetwork ? 'pointer' : 'default',
+              fontWeight: 500,
+            }}
+            id="btn-network-status"
+          >
             <span style={{
               width: '6px',
               height: '6px',
               borderRadius: '50%',
               backgroundColor: isCorrectNetwork ? 'var(--status-emerald)' : 'var(--status-amber)',
             }} />
-            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-              {isCorrectNetwork ? 'Sepolia' : 'Wrong Network'}
+            <span>
+              {isCorrectNetwork ? 'Sepolia' : '⚡ Switch to Sepolia'}
             </span>
-          </div>
+          </button>
 
           {/* Wallet */}
           {account ? (

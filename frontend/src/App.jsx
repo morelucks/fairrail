@@ -74,10 +74,43 @@ export default function App() {
 
   const activePrivyWallet = wallets && wallets.length > 0 ? wallets[0] : null;
 
-  // Direct EIP-1193 / MetaMask Connection Handler
+  // Switch to Sepolia network helper
+  const handleSwitchNetwork = async () => {
+    if (!window.ethereum) return;
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: CHAIN_CONFIG.chainId }],
+      });
+      setChainId(CHAIN_CONFIG.chainIdDecimal);
+    } catch (switchError) {
+      // 4902 error code indicates chain has not been added to wallet
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: CHAIN_CONFIG.chainId,
+              chainName: CHAIN_CONFIG.chainName,
+              rpcUrls: [CHAIN_CONFIG.rpcUrl],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+              blockExplorerUrls: [CHAIN_CONFIG.explorerUrl],
+            }],
+          });
+          setChainId(CHAIN_CONFIG.chainIdDecimal);
+        } catch (addError) {
+          console.error('Failed to add Sepolia network:', addError);
+        }
+      } else {
+        console.error('Failed to switch to Sepolia network:', switchError);
+      }
+    }
+  };
+
+  // Direct EIP-1193 / Browser Wallet Connection Handler
   const connectDirectWallet = async () => {
     if (!window.ethereum) {
-      alert('Please install MetaMask or another EVM wallet to interact with FairRail.');
+      alert('No EVM wallet detected. Please install MetaMask, Coinbase Wallet, or Rabby.');
       return;
     }
 
@@ -96,34 +129,66 @@ export default function App() {
       setAccount(userAccount);
       setBalance(ethers.formatEther(userBalanceWei));
       setChainId(Number(network.chainId));
+
+      // Auto switch if wrong network
+      if (Number(network.chainId) !== CHAIN_CONFIG.chainIdDecimal) {
+        await handleSwitchNetwork();
+      }
     } catch (err) {
-      console.error('Wallet connection failed:', err);
+      console.error('Browser wallet connection failed:', err);
     } finally {
       setIsConnecting(false);
     }
   };
 
-  // Connect Handler (Privy modal with direct EIP-1193 fallback)
+  // Connect Handler (Direct EVM browser wallet priority + Privy fallback)
   const handleConnectWallet = async () => {
-    if (ready && login) {
+    if (window.ethereum) {
+      await connectDirectWallet();
+    } else if (ready && login) {
       try {
         setIsConnecting(true);
         await login();
       } catch (err) {
-        console.warn('Privy login modal fallback to direct wallet:', err);
-        await connectDirectWallet();
+        console.warn('Privy login error:', err);
       } finally {
         setIsConnecting(false);
       }
     } else {
-      await connectDirectWallet();
+      alert('Please install MetaMask or an EVM wallet to interact with FairRail.');
     }
   };
+
+  // Auto-connect on page load if browser wallet is already unlocked/authorized
+  useEffect(() => {
+    async function checkAutoConnect() {
+      if (window.ethereum) {
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum);
+          const accounts = await browserProvider.send('eth_accounts', []);
+          if (accounts.length > 0) {
+            const userSigner = await browserProvider.getSigner();
+            const network = await browserProvider.getNetwork();
+            const userBalanceWei = await browserProvider.getBalance(accounts[0]);
+
+            setProvider(browserProvider);
+            setSigner(userSigner);
+            setAccount(accounts[0]);
+            setBalance(ethers.formatEther(userBalanceWei));
+            setChainId(Number(network.chainId));
+          }
+        } catch (err) {
+          console.warn('Auto-connect check quiet error:', err);
+        }
+      }
+    }
+    checkAutoConnect();
+  }, []);
 
   // Sync Privy connected wallet when activePrivyWallet changes
   useEffect(() => {
     async function initPrivyWallet() {
-      if (activePrivyWallet) {
+      if (activePrivyWallet && !account) {
         try {
           const eip1193Provider = await activePrivyWallet.getEthereumProvider();
           const browserProvider = new ethers.BrowserProvider(eip1193Provider);
@@ -158,47 +223,58 @@ export default function App() {
     }
 
     initPrivyWallet();
-  }, [activePrivyWallet]);
+  }, [activePrivyWallet, account]);
 
   // Listen for direct window.ethereum account & chain changes
   useEffect(() => {
     if (window.ethereum) {
       const handleAccounts = (accounts) => {
-        if (accounts.length > 0 && !activePrivyWallet) {
+        if (accounts.length > 0) {
           setAccount(accounts[0]);
-        } else if (accounts.length === 0 && !activePrivyWallet) {
+          if (provider) {
+            provider.getSigner().then(setSigner).catch(console.error);
+            provider.getBalance(accounts[0]).then((bal) => setBalance(ethers.formatEther(bal))).catch(console.error);
+          }
+        } else {
           setAccount('');
           setSigner(null);
+          setBalance('0');
         }
       };
 
-      const handleChain = () => {
-        window.location.reload();
+      const handleChain = (hexChainId) => {
+        if (typeof hexChainId === 'string') {
+          setChainId(parseInt(hexChainId, 16));
+        } else {
+          window.location.reload();
+        }
       };
 
       window.ethereum.on('accountsChanged', handleAccounts);
       window.ethereum.on('chainChanged', handleChain);
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccounts);
-        window.ethereum.removeListener('chainChanged', handleChain);
+        if (window.ethereum.removeListener) {
+          window.ethereum.removeListener('accountsChanged', handleAccounts);
+          window.ethereum.removeListener('chainChanged', handleChain);
+        }
       };
     }
-  }, [activePrivyWallet]);
+  }, [provider]);
 
-  // Handle Logout
+  // Logout / Disconnect Handler
   const handleLogout = async () => {
-    if (logout) {
+    if (logout && activePrivyWallet) {
       try {
         await logout();
       } catch (err) {
-        console.warn('Privy logout warning:', err);
+        console.warn('Privy logout error:', err);
       }
     }
     setAccount('');
+    setSigner(null);
     setBalance('0');
     setProvider(null);
-    setSigner(null);
     setChainId(null);
   };
 
@@ -219,6 +295,7 @@ export default function App() {
           onConnect={handleConnectWallet}
           onLogout={handleLogout}
           chainId={chainId}
+          onSwitchNetwork={handleSwitchNetwork}
         />
 
         {/* Architecture Pipeline Banner */}
