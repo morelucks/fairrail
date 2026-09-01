@@ -293,6 +293,13 @@ export default function App() {
     setChainId(null);
   };
 
+  // Progressive Access: Auto-transition to Trader Portal when wallet connects on overview
+  useEffect(() => {
+    if (account && activeTab === 'overview') {
+      setActiveTab('trader');
+    }
+  }, [account]);
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
 
@@ -311,6 +318,9 @@ export default function App() {
           onLogout={handleLogout}
           chainId={chainId}
           onSwitchNetwork={handleSwitchNetwork}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          navItems={NAV_ITEMS}
         />
 
         {/* Architecture Pipeline Banner */}
