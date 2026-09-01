@@ -2,15 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import Header from './components/Header';
+import LandingHero from './components/LandingHero';
 import TraderPortal from './components/TraderPortal';
 import IntentQueue from './components/IntentQueue';
 import MevAuctionPortal from './components/MevAuctionPortal';
 import LpDashboard from './components/LpDashboard';
 import KeeperPanel from './components/KeeperPanel';
 import { CHAIN_CONFIG } from './config/contracts';
-import { Shield, Gavel, TrendingUp, Layers, ChevronRight, Zap, ArrowRight, Github, Bot } from 'lucide-react';
+import { Shield, Gavel, TrendingUp, Layers, ChevronRight, Zap, ArrowRight, Github, Bot, Sparkles } from 'lucide-react';
 
 const NAV_ITEMS = [
+  {
+    key: 'overview',
+    label: 'Protocol Overview',
+    sub: 'Hero Landing Page',
+    icon: Sparkles,
+    accentColor: 'var(--accent-primary-light)',
+    badge: 'UHI10 Hero',
+  },
   {
     key: 'trader',
     label: 'Trader Portal',
@@ -54,6 +63,7 @@ const NAV_ITEMS = [
 ];
 
 const PIPELINE_STEPS = [
+  { key: 'overview', label: '0. Protocol Overview', icon: '✨' },
   { key: 'trader', label: '1. Private Intent', icon: '📝' },
   { key: 'queue', label: '2. Batch Match', icon: '🔗' },
   { key: 'keeper', label: '3. Chainlink DON', icon: '🤖' },
@@ -75,7 +85,7 @@ export default function App() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState('trader');
+  const [activeTab, setActiveTab] = useState('overview');
 
   const activePrivyWallet = wallets && wallets.length > 0 ? wallets[0] : null;
 
@@ -449,6 +459,13 @@ export default function App() {
           {/* Main Content Area */}
           <main style={{ flex: 1, minWidth: 0 }}>
             <div className="animate-in animate-in-delay-2" key={activeTab}>
+              {activeTab === 'overview' && (
+                <LandingHero
+                  onLaunchApp={() => setActiveTab('trader')}
+                  onSelectTab={(tab) => setActiveTab(tab)}
+                />
+              )}
+
               {activeTab === 'trader' && (
                 <TraderPortal
                   signer={signer}
