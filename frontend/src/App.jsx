@@ -17,6 +17,7 @@ const NAV_ITEMS = [
     sub: 'Private Intent Matching',
     icon: Shield,
     accentColor: 'var(--accent-purple)',
+    badge: 'EIP-712',
   },
   {
     key: 'queue',
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
     sub: 'Pending Batch Queue',
     icon: Layers,
     accentColor: 'var(--accent-cyan)',
+    badge: 'Live Queue',
   },
   {
     key: 'keeper',
@@ -31,6 +33,7 @@ const NAV_ITEMS = [
     sub: 'Automation DON',
     icon: Bot,
     accentColor: '#375bd2',
+    badge: 'DON Active',
   },
   {
     key: 'auction',
@@ -38,6 +41,7 @@ const NAV_ITEMS = [
     sub: 'Searcher Bidding',
     icon: Gavel,
     accentColor: 'var(--accent-pink)',
+    badge: 'Searcher Bids',
   },
   {
     key: 'lp',
@@ -45,15 +49,16 @@ const NAV_ITEMS = [
     sub: 'Revenue & Claims',
     icon: TrendingUp,
     accentColor: 'var(--accent-emerald)',
+    badge: '80% Yield',
   },
 ];
 
 const PIPELINE_STEPS = [
-  { label: 'Submit Intent', icon: '📝' },
-  { label: 'Batch Match', icon: '🔗' },
-  { label: 'AMM Swap', icon: '🔄' },
-  { label: 'MEV Auction', icon: '🔨' },
-  { label: 'LP Yield', icon: '💰' },
+  { key: 'trader', label: '1. Private Intent', icon: '📝' },
+  { key: 'queue', label: '2. Batch Match', icon: '🔗' },
+  { key: 'keeper', label: '3. Chainlink DON', icon: '🤖' },
+  { key: 'auction', label: '4. MEV Auction', icon: '🔨' },
+  { key: 'lp', label: '5. LP Yield', icon: '💰' },
 ];
 
 export default function App() {
@@ -300,21 +305,65 @@ export default function App() {
 
         {/* Architecture Pipeline Banner */}
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem' }}>
-          <div className="glass-card animate-in" style={{ marginBottom: '1.5rem' }}>
+          <div className="glass-card animate-in" style={{ marginBottom: '1.25rem' }}>
             <div className="pipeline">
               {PIPELINE_STEPS.map((step, i) => (
-                <React.Fragment key={step.label}>
-                  <div
-                    className={`pipeline__step ${activeTab === NAV_ITEMS[Math.min(i, NAV_ITEMS.length - 1)]?.key ? 'pipeline__step--active' : ''}`}
+                <React.Fragment key={step.key}>
+                  <button
+                    onClick={() => setActiveTab(step.key)}
+                    className={`pipeline__step ${activeTab === step.key ? 'pipeline__step--active' : ''}`}
+                    style={{ cursor: 'pointer', border: '1px solid var(--border-color)', outline: 'none' }}
                   >
                     <span>{step.icon}</span>
                     <span>{step.label}</span>
-                  </div>
+                  </button>
                   {i < PIPELINE_STEPS.length - 1 && (
                     <ChevronRight size={14} className="pipeline__arrow" />
                   )}
                 </React.Fragment>
               ))}
+            </div>
+
+            {/* Protocol Summary Ribbon */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.65rem 1rem',
+                marginTop: '0.75rem',
+                borderTop: '1px solid var(--border-subtle)',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+                fontSize: '0.75rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Target Pool:</span>
+                <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>ETH / USDC (0.30%)</strong>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Uniswap v4 Hook:</span>
+                <span className="badge badge-emerald" style={{ fontSize: '0.68rem' }}>Sepolia Verified</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Oracle Guard:</span>
+                <span className="badge" style={{ background: 'rgba(55, 91, 210, 0.15)', color: '#375bd2', border: '1px solid rgba(55, 91, 210, 0.3)', fontSize: '0.68rem' }}>
+                  Chainlink (100 bps)
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Cross-Chain Bridge:</span>
+                <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>Across V3 SpokePool</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>LP Revenue Split:</span>
+                <strong style={{ color: 'var(--status-emerald)' }}>80% to LPs</strong>
+              </div>
             </div>
           </div>
         </div>
@@ -344,9 +393,27 @@ export default function App() {
                   <div className="sidebar__icon">
                     <Icon size={18} />
                   </div>
-                  <div className="sidebar__label">
-                    <span>{item.label}</span>
-                    <span className="sidebar__label-sub">{item.sub}</span>
+                  <div className="sidebar__label" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div>{item.label}</div>
+                      <div className="sidebar__label-sub">{item.sub}</div>
+                    </div>
+                    {item.badge && (
+                      <span
+                        style={{
+                          fontSize: '0.62rem',
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: 'var(--radius-pill)',
+                          background: isActive ? item.accentColor : 'var(--bg-tertiary)',
+                          color: isActive ? '#ffffff' : 'var(--text-muted)',
+                          border: '1px solid var(--border-color)',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </div>
                 </button>
               );
