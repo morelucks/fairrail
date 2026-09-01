@@ -31,9 +31,10 @@ All contracts are deployed live on **Ethereum Sepolia Testnet** and verified on 
 
 | Contract | Address | Etherscan Link |
 | :--- | :--- | :--- |
-| **`FairRailHook`** | `0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x7f18f2f796ed2beb1c5ff625fa9d3280cd4940c8#code) |
-| **`IntentMatcher`** | `0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x88b222cc2c5ab1d5a67379c44a6bcca80be9e829#code) |
-| **`MevAuction`** | `0x08c8ababe136a66e10d5c20f6553f9726284343c` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x08c8ababe136a66e10d5c20f6553f9726284343c#code) |
+| **`FairRailHook`** | `0x3a364944a3efbd03566f68d75beed7c7883d00c8` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x3a364944a3efbd03566f68d75beed7c7883d00c8#code) |
+| **`IntentMatcher`** | `0x6d3e48af765e2f3a43a9e09668130a8f718c5c3f` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x6d3e48af765e2f3a43a9e09668130a8f718c5c3f#code) |
+| **`MevAuction`** | `0x303f3d0cbb8527d4511ec62bda09f1f8d5d2bb79` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x303f3d0cbb8527d4511ec62bda09f1f8d5d2bb79#code) |
+| **`FairRailKeeper`** | `0x7355e5f60a90eb7326acfc97b4839833fa5913c0` | [![Etherscan Verified](https://img.shields.io/badge/Etherscan-Verified-success?style=flat-square&logo=ethereum)](https://sepolia.etherscan.io/address/0x7355e5f60a90eb7326acfc97b4839833fa5913c0#code) |
 | **`PoolManager`** | `0x000000000004444c5dc75cB358380D2e3dE08A90` | Canonical Uniswap v4 PoolManager |
 
 - **Chain ID**: `11155111` (Ethereum Sepolia)
