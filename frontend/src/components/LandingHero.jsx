@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Gavel, TrendingUp, Layers, Bot, Globe, Cpu, ArrowRight, Zap, CheckCircle2, ExternalLink, Sparkles, Lock, BarChart3 } from 'lucide-react';
+import { Shield, Gavel, TrendingUp, Layers, Bot, Globe, Cpu, ArrowRight, Zap, CheckCircle2, ExternalLink, Sparkles, Lock, BarChart3, HelpCircle } from 'lucide-react';
 import { CONTRACT_ADDRESSES, CHAIN_CONFIG } from '../config/contracts';
 
 export default function LandingHero({ onLaunchApp, onSelectTab }) {
@@ -61,10 +61,30 @@ export default function LandingHero({ onLaunchApp, onSelectTab }) {
   ];
 
   const METRICS = [
-    { label: 'Total Matched Volume', value: '$14.8M+', sub: 'Zero AMM Impact' },
-    { label: 'MEV Recaptured for LPs', value: '$320K+', sub: '80% Direct Split' },
-    { label: 'Test Suite Coverage', value: '68 / 68', sub: '100% Passing (Forge)' },
-    { label: 'Oracle Guard Deviation', value: '1.00%', sub: 'Chainlink Enforced' },
+    {
+      label: 'Total Matched Volume',
+      value: '$14.8M+',
+      sub: 'Zero AMM Impact',
+      tooltip: 'Off-chain P2P intent batch matching settled before hitting the AMM pool reserves, shielding trades from slippage & frontrunning.',
+    },
+    {
+      label: 'MEV Recaptured for LPs',
+      value: '$320K+',
+      sub: '80% Direct Split',
+      tooltip: 'Auction proceeds captured from backrunning & arbitrage searcher bids via hook callbacks, with 80% streamed directly to pool LPs.',
+    },
+    {
+      label: 'Test Suite Coverage',
+      value: '68 / 68',
+      sub: '100% Passing (Forge)',
+      tooltip: 'Verified Foundry unit & fuzzing tests covering EIP-712 signatures, Chainlink oracle guards, Across relays, and Hook callbacks.',
+    },
+    {
+      label: 'Oracle Guard Deviation',
+      value: '1.00%',
+      sub: 'Chainlink Enforced',
+      tooltip: 'Maximum allowable execution rate deviation validated against real-time Chainlink AggregatorV3 price feeds before filling matches.',
+    },
   ];
 
   return (
@@ -209,10 +229,18 @@ export default function LandingHero({ onLaunchApp, onSelectTab }) {
       </div>
 
       {/* Live Protocol Stat Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         {METRICS.map((m, idx) => (
-          <div key={idx} className="stat-card" style={{ padding: '1.25rem' }}>
-            <div className="stat-card__label">{m.label}</div>
+          <div key={idx} className="stat-card" style={{ padding: '1.25rem', position: 'relative' }}>
+            <div className="stat-card__label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{m.label}</span>
+              <div className="tooltip-container" style={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}>
+                <HelpCircle size={14} style={{ color: 'var(--text-muted)', transition: 'color 0.2s ease' }} className="tooltip-icon" />
+                <div className="tooltip-popup">
+                  {m.tooltip}
+                </div>
+              </div>
+            </div>
             <div className="stat-card__value" style={{ fontSize: '1.75rem', margin: '0.3rem 0' }}>
               {m.value}
             </div>
