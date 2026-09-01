@@ -323,197 +323,57 @@ export default function App() {
           navItems={NAV_ITEMS}
         />
 
-        {/* Architecture Pipeline Banner */}
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem' }}>
-          <div className="glass-card animate-in" style={{ marginBottom: '1.25rem' }}>
-            <div className="pipeline">
-              {PIPELINE_STEPS.map((step, i) => (
-                <React.Fragment key={step.key}>
-                  <button
-                    onClick={() => setActiveTab(step.key)}
-                    className={`pipeline__step ${activeTab === step.key ? 'pipeline__step--active' : ''}`}
-                    style={{ cursor: 'pointer', border: '1px solid var(--border-color)', outline: 'none' }}
-                  >
-                    <span>{step.icon}</span>
-                    <span>{step.label}</span>
-                  </button>
-                  {i < PIPELINE_STEPS.length - 1 && (
-                    <ChevronRight size={14} className="pipeline__arrow" />
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* Protocol Summary Ribbon */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0.65rem 1rem',
-                marginTop: '0.75rem',
-                borderTop: '1px solid var(--border-subtle)',
-                flexWrap: 'wrap',
-                gap: '0.75rem',
-                fontSize: '0.75rem',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Target Pool:</span>
-                <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>ETH / USDC (0.30%)</strong>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Uniswap v4 Hook:</span>
-                <span className="badge badge-emerald" style={{ fontSize: '0.68rem' }}>Sepolia Verified</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Oracle Guard:</span>
-                <span className="badge" style={{ background: 'rgba(55, 91, 210, 0.15)', color: '#375bd2', border: '1px solid rgba(55, 91, 210, 0.3)', fontSize: '0.68rem' }}>
-                  Chainlink (100 bps)
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Cross-Chain Bridge:</span>
-                <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>Across V3 SpokePool</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>LP Revenue Split:</span>
-                <strong style={{ color: 'var(--status-emerald)' }}>80% to LPs</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* App Layout: Sidebar + Content */}
-        <div className="app-layout" style={{
+        {/* Main Content Area (Full Width, single navigation via Header) */}
+        <div style={{
           maxWidth: '1400px',
           margin: '0 auto',
-          padding: '0 1.5rem',
-          display: 'flex',
-          gap: '1.5rem',
-          alignItems: 'flex-start',
+          padding: '0 1.5rem 3rem',
         }}>
+          <main style={{ width: '100%' }} className="animate-in">
+            {activeTab === 'overview' && (
+              <LandingHero
+                onLaunchApp={() => setActiveTab('trader')}
+                onSelectTab={(tab) => setActiveTab(tab)}
+              />
+            )}
 
-          {/* Sidebar Navigation */}
-          <nav className="sidebar glass-card animate-in animate-in-delay-1">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.key;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setActiveTab(item.key)}
-                  className={`sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
-                  id={`nav-${item.key}`}
-                >
-                  <div className="sidebar__icon">
-                    <Icon size={18} />
-                  </div>
-                  <div className="sidebar__label" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div>{item.label}</div>
-                      <div className="sidebar__label-sub">{item.sub}</div>
-                    </div>
-                    {item.badge && (
-                      <span
-                        style={{
-                          fontSize: '0.62rem',
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: 'var(--radius-pill)',
-                          background: isActive ? item.accentColor : 'var(--bg-tertiary)',
-                          color: isActive ? '#ffffff' : 'var(--text-muted)',
-                          border: '1px solid var(--border-color)',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+            {activeTab === 'trader' && (
+              <TraderPortal
+                signer={signer}
+                account={account}
+                onIntentSubmitted={() => setActiveTab('queue')}
+              />
+            )}
 
-            {/* Sidebar Footer Info */}
-            <div style={{
-              marginTop: 'auto',
-              padding: '1rem 0.75rem 0.5rem',
-              borderTop: '1px solid var(--border-color)',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '0.5rem',
-              }}>
-                <span className="badge badge-live">Sepolia Live</span>
-                <span className="badge badge-purple" style={{ fontSize: '0.65rem' }}>EVM + Privy</span>
-              </div>
-              <p style={{
-                fontSize: '0.72rem',
-                color: 'var(--text-muted)',
-                lineHeight: 1.5,
-              }}>
-                Uniswap v4 Hook • UHI10
-                <br />
-                Sustainable Liquidity & MEV Protection
-              </p>
-            </div>
-          </nav>
+            {activeTab === 'queue' && (
+              <IntentQueue
+                provider={provider}
+                signer={signer}
+              />
+            )}
 
-          {/* Main Content Area */}
-          <main style={{ flex: 1, minWidth: 0 }}>
-            <div className="animate-in animate-in-delay-2" key={activeTab}>
-              {activeTab === 'overview' && (
-                <LandingHero
-                  onLaunchApp={() => setActiveTab('trader')}
-                  onSelectTab={(tab) => setActiveTab(tab)}
-                />
-              )}
+            {activeTab === 'keeper' && (
+              <KeeperPanel
+                provider={provider}
+                signer={signer}
+              />
+            )}
 
-              {activeTab === 'trader' && (
-                <TraderPortal
-                  signer={signer}
-                  account={account}
-                  onIntentSubmitted={() => setActiveTab('queue')}
-                />
-              )}
+            {activeTab === 'auction' && (
+              <MevAuctionPortal
+                provider={provider}
+                signer={signer}
+                account={account}
+              />
+            )}
 
-              {activeTab === 'queue' && (
-                <IntentQueue
-                  provider={provider}
-                  signer={signer}
-                />
-              )}
-
-              {activeTab === 'keeper' && (
-                <KeeperPanel
-                  provider={provider}
-                  signer={signer}
-                />
-              )}
-
-              {activeTab === 'auction' && (
-                <MevAuctionPortal
-                  provider={provider}
-                  signer={signer}
-                  account={account}
-                />
-              )}
-
-              {activeTab === 'lp' && (
-                <LpDashboard
-                  provider={provider}
-                  signer={signer}
-                  account={account}
-                />
-              )}
-            </div>
+            {activeTab === 'lp' && (
+              <LpDashboard
+                provider={provider}
+                signer={signer}
+                account={account}
+              />
+            )}
           </main>
         </div>
 
