@@ -34,20 +34,17 @@ export default function Header({ account, balance, isConnecting, onConnect, onLo
 
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--accent-primary)',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.2rem',
-            flexShrink: 0,
-          }}>
-            🚆
-          </div>
+          <img
+            src="/logo.png"
+            alt="FairRail Logo"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: 'var(--radius-sm)',
+              objectFit: 'contain',
+              flexShrink: 0,
+            }}
+          />
           <div>
             <h1 style={{
               fontSize: '1.15rem',

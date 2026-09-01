@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/assets/logo.png" alt="FairRail Logo" width="140" style="border-radius: 16px;" />
+</p>
+
 # FairRail
 
 > **Private Intent Matching & LP-Owned MEV Auctions on Uniswap v4**

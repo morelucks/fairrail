@@ -109,15 +109,28 @@ export default function LandingHero({ onLaunchApp, onSelectTab }) {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: '850px' }}>
           
-          {/* Top Pill Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-            <span className="badge badge-purple" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-              <Sparkles size={13} style={{ marginRight: '4px' }} />
-              Uniswap Hookathon (UHI10) Submission
-            </span>
-            <span className="badge badge-emerald" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-              Ethereum Sepolia Live
-            </span>
+          {/* Brand Logo & Badges */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <img
+              src="/logo.png"
+              alt="FairRail Logo"
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)',
+                objectFit: 'contain',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span className="badge badge-purple" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
+                <Sparkles size={13} style={{ marginRight: '4px' }} />
+                Uniswap Hookathon (UHI10) Submission
+              </span>
+              <span className="badge badge-emerald" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
+                Ethereum Sepolia Live
+              </span>
+            </div>
           </div>
 
           {/* Main Title */}
