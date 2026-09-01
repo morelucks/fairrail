@@ -6,8 +6,9 @@ import TraderPortal from './components/TraderPortal';
 import IntentQueue from './components/IntentQueue';
 import MevAuctionPortal from './components/MevAuctionPortal';
 import LpDashboard from './components/LpDashboard';
+import KeeperPanel from './components/KeeperPanel';
 import { CHAIN_CONFIG } from './config/contracts';
-import { Shield, Gavel, TrendingUp, Layers, ChevronRight, Zap, ArrowRight, Github } from 'lucide-react';
+import { Shield, Gavel, TrendingUp, Layers, ChevronRight, Zap, ArrowRight, Github, Bot } from 'lucide-react';
 
 const NAV_ITEMS = [
   {
@@ -23,6 +24,13 @@ const NAV_ITEMS = [
     sub: 'Pending Batch Queue',
     icon: Layers,
     accentColor: 'var(--accent-cyan)',
+  },
+  {
+    key: 'keeper',
+    label: 'Chainlink Keeper',
+    sub: 'Automation DON',
+    icon: Bot,
+    accentColor: '#375bd2',
   },
   {
     key: 'auction',
@@ -307,6 +315,13 @@ export default function App() {
 
               {activeTab === 'queue' && (
                 <IntentQueue
+                  provider={provider}
+                  signer={signer}
+                />
+              )}
+
+              {activeTab === 'keeper' && (
+                <KeeperPanel
                   provider={provider}
                   signer={signer}
                 />
