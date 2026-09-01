@@ -7,6 +7,7 @@ import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {IntentMatcher} from "../src/IntentMatcher.sol";
 import {FairRailHook} from "../src/FairRailHook.sol";
+import {FairRailKeeper} from "../src/FairRailKeeper.sol";
 
 /**
  * @title DeployFairRail
@@ -15,6 +16,7 @@ import {FairRailHook} from "../src/FairRailHook.sol";
  * @dev Usage:
  *   PRIVATE_KEY=0x... forge script script/DeployFairRail.s.sol --broadcast --rpc-url <rpc>
  *   Optionally set POOL_MANAGER=0x... to override the default PoolManager address.
+ *   Optionally set SPOKE_POOL=0x... to set the Across V3 SpokePool address.
  */
 contract DeployFairRail is Script {
     // Maximum iterations for salt mining to prevent infinite loops
@@ -23,14 +25,18 @@ contract DeployFairRail is Script {
     function run() external {
         // PRIVATE_KEY must be set via environment variable — script will revert if missing
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
         address poolManager = vm.envOr("POOL_MANAGER", address(0x000000000004444c5dc75cB358380D2e3dE08A90));
-
+        // Across V3 SpokePool — default is Sepolia address (set to address(0) to disable cross-chain)
+        address spokePool = vm.envOr("SPOKE_POOL", address(0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5));
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy IntentMatcher (no address constraints)
-        IntentMatcher matcher = new IntentMatcher();
+        // 1. Deploy IntentMatcher with Across SpokePool and owner
+        IntentMatcher matcher = new IntentMatcher(spokePool, deployer);
         console.log("IntentMatcher deployed to:", address(matcher));
+        console.log("  SpokePool:", spokePool);
+        console.log("  Owner:", deployer);
 
         // 2. Mine a CREATE2 salt that produces a hook address with the required permission flags
         uint160 hookFlags = uint160(
@@ -68,6 +74,17 @@ contract DeployFairRail is Script {
             uint160(address(hook)) & uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) != 0,
             "DeployFairRail: BEFORE_SWAP_RETURNS_DELTA_FLAG not set"
         );
+
+        // 5. Deploy FairRailKeeper for Chainlink Automation
+        FairRailKeeper keeper = new FairRailKeeper(address(matcher), 2); // min 2 pending intents to trigger
+        console.log("FairRailKeeper deployed to:", address(keeper));
+
+        // 6. Configure Chainlink Price Feeds (Sepolia defaults)
+        // ETH/USD: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+        // LINK/USD: 0xc59E3633BAAC7321a9122920fA9328029651786f
+        // Uncomment and set token addresses to configure feeds:
+        // matcher.setPriceFeed(<TOKEN_ADDRESS>, 0x694AA1769357215DE4FAC081bf1f309aDC325306);
+        // matcher.setOracleValidationEnabled(true);
 
         vm.stopBroadcast();
     }

@@ -2,6 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
+import {AcrossMessageHandler} from "./interfaces/IAcrossMessageHandler.sol";
+import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
 
 /**
  * @title IntentMatcher
@@ -9,8 +11,12 @@ import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
  * @dev Pre-filters swap flow before hitting the Uniswap v4 AMM pool, reducing slippage and LVR exposure.
  *      Uses EIP-712 structured data signing for intent authentication and nonce-based replay protection.
  *      Traders must approve this contract to spend their tokens before submitting intents.
+ *
+ *      Integrations:
+ *      - Across Protocol V3: Receives cross-chain intents via handleV3AcrossMessage callback
+ *      - Chainlink Price Feeds: Validates intent match prices against oracle reference rates
  */
-contract IntentMatcher {
+contract IntentMatcher is AcrossMessageHandler {
     struct TradeIntent {
         address trader;
         address tokenIn;
@@ -40,6 +46,45 @@ contract IntentMatcher {
     uint256 private immutable _CHAIN_ID;
 
     // ──────────────────────────────────────────────────────
+    //  Ownership
+    // ──────────────────────────────────────────────────────
+
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "IntentMatcher: not owner");
+        _;
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Across Protocol V3
+    // ──────────────────────────────────────────────────────
+
+    /// @notice The Across V3 SpokePool authorized to deliver cross-chain intents
+    address public immutable spokePool;
+
+    modifier onlySpokePool() {
+        require(msg.sender == spokePool, "IntentMatcher: only SpokePool");
+        _;
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Chainlink Price Feeds
+    // ──────────────────────────────────────────────────────
+
+    /// @notice Maps token addresses to their Chainlink price feed aggregators
+    mapping(address => address) public priceFeeds;
+
+    /// @notice Maximum allowed price deviation in basis points (default 100 = 1%)
+    uint256 public maxPriceDeviationBps = 100;
+
+    /// @notice Maximum staleness for price feed data (default 1 hour)
+    uint256 public maxPriceStaleness = 1 hours;
+
+    /// @notice Whether oracle price validation is enforced on batch matches
+    bool public oracleValidationEnabled = false;
+
+    // ──────────────────────────────────────────────────────
     //  State
     // ──────────────────────────────────────────────────────
 
@@ -62,6 +107,16 @@ contract IntentMatcher {
         uint256 outputAmount
     );
 
+    event CrossChainIntentReceived(
+        address indexed trader,
+        address tokenSent,
+        uint256 amount,
+        address relayer
+    );
+
+    event PriceFeedUpdated(address indexed token, address indexed feed);
+    event OracleValidationToggled(bool enabled);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ──────────────────────────────────────────────────────
     //  Errors
@@ -73,14 +128,34 @@ contract IntentMatcher {
     error IncompatibleTokens();
     error InvalidNonce();
     error TransferFailed();
+    error OraclePriceDeviation();
+    error StaleOraclePrice();
+    error InvalidOraclePrice();
+    error NoPriceFeedConfigured();
 
     // ──────────────────────────────────────────────────────
     //  Constructor
     // ──────────────────────────────────────────────────────
 
-    constructor() {
+    /**
+     * @param _spokePool Address of the Across V3 SpokePool on this chain (set to address(0) to disable cross-chain)
+     * @param _owner Address of the contract owner for admin functions
+     */
+    constructor(address _spokePool, address _owner) {
         _CHAIN_ID = block.chainid;
         _DOMAIN_SEPARATOR = _computeDomainSeparator();
+        spokePool = _spokePool;
+        owner = _owner;
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Ownership
+    // ──────────────────────────────────────────────────────
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "IntentMatcher: zero address");
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
     }
 
     // ──────────────────────────────────────────────────────
@@ -162,6 +237,153 @@ contract IntentMatcher {
     }
 
     // ──────────────────────────────────────────────────────
+    //  Chainlink Price Feed Management
+    // ──────────────────────────────────────────────────────
+
+    /**
+     * @notice Configures a Chainlink price feed for a given token
+     * @param token The ERC-20 token address
+     * @param feed The Chainlink AggregatorV3 price feed address
+     */
+    function setPriceFeed(address token, address feed) external onlyOwner {
+        priceFeeds[token] = feed;
+        emit PriceFeedUpdated(token, feed);
+    }
+
+    /**
+     * @notice Updates the maximum allowed price deviation for oracle validation
+     * @param _bps Deviation in basis points (e.g., 100 = 1%)
+     */
+    function setMaxPriceDeviationBps(uint256 _bps) external onlyOwner {
+        require(_bps > 0 && _bps <= 5000, "IntentMatcher: deviation out of range");
+        maxPriceDeviationBps = _bps;
+    }
+
+    /**
+     * @notice Updates the maximum staleness threshold for price data
+     * @param _seconds Maximum age of price data in seconds
+     */
+    function setMaxPriceStaleness(uint256 _seconds) external onlyOwner {
+        require(_seconds > 0, "IntentMatcher: zero staleness");
+        maxPriceStaleness = _seconds;
+    }
+
+    /**
+     * @notice Enables or disables oracle price validation on batch matches
+     */
+    function setOracleValidationEnabled(bool _enabled) external onlyOwner {
+        oracleValidationEnabled = _enabled;
+        emit OracleValidationToggled(_enabled);
+    }
+
+    /**
+     * @notice Reads the latest price for a token from its configured Chainlink feed
+     * @param token The token to query the price for
+     * @return price The latest price as a uint256
+     * @return feedDecimals The number of decimals in the feed's price
+     */
+    function getLatestPrice(address token) public view returns (uint256 price, uint8 feedDecimals) {
+        address feedAddress = priceFeeds[token];
+        if (feedAddress == address(0)) revert NoPriceFeedConfigured();
+
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(feedAddress);
+        (
+            /* uint80 roundId */,
+            int256 rawPrice,
+            /* uint256 startedAt */,
+            uint256 updatedAt,
+            /* uint80 answeredInRound */
+        ) = priceFeed.latestRoundData();
+
+        if (rawPrice <= 0) revert InvalidOraclePrice();
+        if (block.timestamp - updatedAt > maxPriceStaleness) revert StaleOraclePrice();
+
+        return (uint256(rawPrice), priceFeed.decimals());
+    }
+
+    /**
+     * @notice Validates that a match price is within acceptable deviation of Chainlink oracle rates
+     * @param tokenIn The input token
+     * @param tokenOut The output token
+     * @param amountIn Amount of tokenIn being traded
+     * @param amountOut Amount of tokenOut being received
+     * @return valid True if the price is within the acceptable deviation
+     */
+    function validateMatchPrice(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    ) public view returns (bool valid) {
+        // If either token has no feed configured, skip validation (return true)
+        if (priceFeeds[tokenIn] == address(0) || priceFeeds[tokenOut] == address(0)) {
+            return true;
+        }
+
+        (uint256 priceIn, uint8 decIn) = getLatestPrice(tokenIn);
+        (uint256 priceOut, uint8 decOut) = getLatestPrice(tokenOut);
+
+        // Calculate expected output: (amountIn * priceIn / priceOut) adjusted for decimal differences
+        // Use intermediate scaling to avoid precision loss
+        uint256 expectedOut = (amountIn * priceIn * (10 ** decOut)) / (priceOut * (10 ** decIn));
+
+        // Allow deviation within maxPriceDeviationBps
+        uint256 minAllowed = (expectedOut * (10000 - maxPriceDeviationBps)) / 10000;
+
+        return amountOut >= minAllowed;
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Across Protocol V3 — Cross-Chain Intent Receipt
+    // ──────────────────────────────────────────────────────
+
+    /**
+     * @notice Callback invoked by the Across SpokePool when a cross-chain deposit is filled
+     * @dev Decodes the trader's intent from the message payload and queues it for batch matching.
+     *      The bridged tokens are already held by this contract when this function is called.
+     * @param tokenSent The token that was bridged to this chain
+     * @param amount The amount of tokens bridged
+     * @param relayer The relayer that fulfilled the deposit
+     * @param message ABI-encoded intent data: (address trader, address tokenOut, uint256 minAmountOut, uint256 deadline)
+     */
+    function handleV3AcrossMessage(
+        address tokenSent,
+        uint256 amount,
+        address relayer,
+        bytes memory message
+    ) external override onlySpokePool {
+        // Decode the cross-chain intent payload
+        (
+            address trader,
+            address tokenOut,
+            uint256 minAmountOut,
+            uint256 deadline
+        ) = abi.decode(message, (address, address, uint256, uint256));
+
+        require(block.timestamp <= deadline, "IntentMatcher: cross-chain intent expired");
+
+        // Assign a nonce and construct the intent
+        uint256 nonce = userNonces[trader];
+        userNonces[trader]++;
+
+        // Add to the pending queue for batch matching
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenSent, tokenOut));
+        _pendingIntents[pairHash].push(TradeIntent({
+            trader: trader,
+            tokenIn: tokenSent,
+            tokenOut: tokenOut,
+            amountIn: amount,
+            minAmountOut: minAmountOut,
+            nonce: nonce,
+            deadline: deadline,
+            signature: "" // Cross-chain intents are authenticated by the SpokePool, not by signature
+        }));
+
+        emit CrossChainIntentReceived(trader, tokenSent, amount, relayer);
+        emit PendingIntentSubmitted(trader, tokenSent, tokenOut, amount, deadline);
+    }
+
+    // ──────────────────────────────────────────────────────
     //  Core Matching Logic
     // ──────────────────────────────────────────────────────
 
@@ -208,13 +430,20 @@ contract IntentMatcher {
         matchedInA = intentA.amountIn < intentB.minAmountOut ? intentA.amountIn : intentB.minAmountOut;
         matchedInB = intentB.amountIn < intentA.minAmountOut ? intentB.amountIn : intentA.minAmountOut;
 
-        // 7. Mark intents as executed and increment nonces
+        // 7. Oracle price validation (if enabled)
+        if (oracleValidationEnabled) {
+            if (!validateMatchPrice(intentA.tokenIn, intentA.tokenOut, matchedInA, matchedInB)) {
+                revert OraclePriceDeviation();
+            }
+        }
+
+        // 8. Mark intents as executed and increment nonces
         executedIntents[hashA] = true;
         executedIntents[hashB] = true;
         userNonces[intentA.trader]++;
         userNonces[intentB.trader]++;
 
-        // 8. Execute token transfers (traders must have approved this contract)
+        // 9. Execute token transfers (traders must have approved this contract)
         //    A sends tokenIn (= B's tokenOut) to B
         //    B sends tokenIn (= A's tokenOut) to A
         bool successA = IERC20Minimal(intentA.tokenIn).transferFrom(intentA.trader, intentB.trader, matchedInA);
@@ -359,6 +588,11 @@ contract IntentMatcher {
             // Ensure the match satisfies the counter-intent's minimum output requirement
             if (matchable < ci.minAmountOut) continue;
 
+            // Oracle price validation (if enabled)
+            if (oracleValidationEnabled) {
+                if (!validateMatchPrice(tokenIn, tokenOut, matchable, matchable)) continue;
+            }
+
             // Execute the match
             totalMatched += matchable;
             totalFilled += matchable; // 1:1 rate for direct P2P matching
@@ -379,6 +613,96 @@ contract IntentMatcher {
         result.remainingAmountIn = remaining;
         result.filledAmountOut = totalFilled;
     }
+
+    // ──────────────────────────────────────────────────────
+    //  Internal Batch Matching (for Chainlink Automation)
+    // ──────────────────────────────────────────────────────
+
+    event InternalBatchMatched(
+        address indexed tokenIn,
+        address indexed tokenOut,
+        uint256 totalMatched
+    );
+
+    /**
+     * @notice Matches pending intents against each other without an incoming swap trigger.
+     *         Scans the forward queue (tokenIn → tokenOut) against the reverse queue (tokenOut → tokenIn)
+     *         and executes P2P matches between pending intents.
+     * @dev Designed to be called by Chainlink Automation Keepers or any external triggerer.
+     * @param tokenIn The input token of the pair to process
+     * @param tokenOut The output token of the pair to process
+     * @return totalMatched Total volume matched across both queues
+     */
+    function processInternalBatchMatching(
+        address tokenIn,
+        address tokenOut
+    ) external returns (uint256 totalMatched) {
+        bytes32 forwardPairHash = keccak256(abi.encodePacked(tokenIn, tokenOut));
+        bytes32 reversePairHash = keccak256(abi.encodePacked(tokenOut, tokenIn));
+
+        TradeIntent[] storage forwardIntents = _pendingIntents[forwardPairHash];
+        TradeIntent[] storage reverseIntents = _pendingIntents[reversePairHash];
+
+        for (uint256 i = 0; i < forwardIntents.length; i++) {
+            TradeIntent storage fi = forwardIntents[i];
+
+            // Skip consumed or expired forward intents
+            if (fi.amountIn == 0 || block.timestamp > fi.deadline) continue;
+
+            for (uint256 j = 0; j < reverseIntents.length; j++) {
+                TradeIntent storage ri = reverseIntents[j];
+
+                // Skip consumed or expired reverse intents
+                if (ri.amountIn == 0 || block.timestamp > ri.deadline) continue;
+
+                // Determine matchable volume: min of both available amounts
+                uint256 matchable = fi.amountIn < ri.amountIn ? fi.amountIn : ri.amountIn;
+
+                // Enforce minimum output requirements
+                if (matchable < fi.minAmountOut || matchable < ri.minAmountOut) continue;
+
+                // Oracle validation (if enabled)
+                if (oracleValidationEnabled) {
+                    if (!validateMatchPrice(tokenIn, tokenOut, matchable, matchable)) continue;
+                }
+
+                // Execute the match
+                totalMatched += matchable;
+
+                // Consume matched volume
+                fi.amountIn -= matchable;
+                ri.amountIn -= matchable;
+
+                // Mark as executed if fully consumed
+                if (fi.amountIn == 0) {
+                    bytes32 fHash = keccak256(
+                        abi.encode(fi.trader, fi.tokenIn, fi.tokenOut, matchable, fi.minAmountOut, fi.nonce, fi.deadline)
+                    );
+                    executedIntents[fHash] = true;
+                    emit IntentMatched(fHash, fi.trader, fi.tokenIn, fi.tokenOut, matchable, matchable);
+                }
+
+                if (ri.amountIn == 0) {
+                    bytes32 rHash = keccak256(
+                        abi.encode(ri.trader, ri.tokenIn, ri.tokenOut, matchable, ri.minAmountOut, ri.nonce, ri.deadline)
+                    );
+                    executedIntents[rHash] = true;
+                    emit IntentMatched(rHash, ri.trader, ri.tokenIn, ri.tokenOut, matchable, matchable);
+                }
+
+                // If forward intent is fully consumed, move to next forward intent
+                if (fi.amountIn == 0) break;
+            }
+        }
+
+        if (totalMatched > 0) {
+            emit InternalBatchMatched(tokenIn, tokenOut, totalMatched);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Queue Cleanup
+    // ──────────────────────────────────────────────────────
 
     /**
      * @notice Compacts the pending intent queue for a token pair by removing consumed and expired entries.

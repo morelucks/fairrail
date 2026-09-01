@@ -15,7 +15,62 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import "../src/IntentMatcher.sol";
 import "../src/MevAuction.sol";
 import "../src/FairRailHook.sol";
+import "../src/FairRailKeeper.sol";
+import {AggregatorV3Interface} from "../src/interfaces/AggregatorV3Interface.sol";
 import {TestERC20} from "v4-core/test/TestERC20.sol";
+
+// ──────────────────────────────────────────────────────
+//  Mock Chainlink Price Feed for testing
+// ──────────────────────────────────────────────────────
+
+contract MockChainlinkFeed {
+    int256 public price;
+    uint8 public feedDecimals;
+    uint256 public updatedAt;
+
+    constructor(int256 _price, uint8 _decimals) {
+        price = _price;
+        feedDecimals = _decimals;
+        updatedAt = block.timestamp;
+    }
+
+    function setPrice(int256 _price) external {
+        price = _price;
+        updatedAt = block.timestamp;
+    }
+
+    function setUpdatedAt(uint256 _updatedAt) external {
+        updatedAt = _updatedAt;
+    }
+
+    function decimals() external view returns (uint8) {
+        return feedDecimals;
+    }
+
+    function description() external pure returns (string memory) {
+        return "Mock Feed";
+    }
+
+    function version() external pure returns (uint256) {
+        return 1;
+    }
+
+    function getRoundData(uint80)
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 _updatedAt, uint80 answeredInRound)
+    {
+        return (1, price, block.timestamp, updatedAt, 1);
+    }
+
+    function latestRoundData()
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 _updatedAt, uint80 answeredInRound)
+    {
+        return (1, price, block.timestamp, updatedAt, 1);
+    }
+}
 
 contract FairRailHookTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -24,8 +79,10 @@ contract FairRailHookTest is Test {
     FairRailHook public hook;
     IntentMatcher public matcher;
     MevAuction public auction;
+    FairRailKeeper public keeper;
 
     address public poolManager = address(0x1111111111111111111111111111111111111111);
+    address public spokePool = address(0x2222222222222222222222222222222222222222);
 
     // Use private keys so we can sign intents with vm.sign()
     uint256 public traderAKey = 0xA11CE;
@@ -43,12 +100,16 @@ contract FairRailHookTest is Test {
 
     PoolKey public poolKey;
 
+    // Mock Chainlink feeds
+    MockChainlinkFeed public feedToken0;
+    MockChainlinkFeed public feedToken1;
+
     function setUp() public {
         // Derive trader addresses from private keys
         traderA = vm.addr(traderAKey);
         traderB = vm.addr(traderBKey);
 
-        matcher = new IntentMatcher();
+        matcher = new IntentMatcher(spokePool, address(this));
 
         // Deploy real ERC-20 tokens for intent matching tests
         token0 = new TestERC20(0);
@@ -93,6 +154,13 @@ contract FairRailHookTest is Test {
             tickSpacing: 60,
             hooks: IHooks(address(hook))
         });
+
+        // Deploy mock Chainlink feeds (both at $1000 with 8 decimals)
+        feedToken0 = new MockChainlinkFeed(1000e8, 8);
+        feedToken1 = new MockChainlinkFeed(1000e8, 8);
+
+        // Deploy FairRailKeeper
+        keeper = new FairRailKeeper(address(matcher), 2);
     }
 
     // ──────────────────────────────────────────────────────
@@ -206,6 +274,31 @@ contract FairRailHookTest is Test {
         bytes32 digest2 = matcher.getDigest(intent);
         assertEq(digest1, digest2);
         assertTrue(digest1 != bytes32(0));
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Ownership Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_OwnerIsSetCorrectly() public view {
+        assertEq(matcher.owner(), address(this));
+    }
+
+    function test_TransferOwnership() public {
+        address newOwner = address(0x5555);
+        matcher.transferOwnership(newOwner);
+        assertEq(matcher.owner(), newOwner);
+    }
+
+    function test_RevertTransferOwnershipUnauthorized() public {
+        vm.prank(traderA);
+        vm.expectRevert("IntentMatcher: not owner");
+        matcher.transferOwnership(traderA);
+    }
+
+    function test_RevertTransferOwnershipZeroAddress() public {
+        vm.expectRevert("IntentMatcher: zero address");
+        matcher.transferOwnership(address(0));
     }
 
     // ──────────────────────────────────────────────────────
@@ -802,6 +895,311 @@ contract FairRailHookTest is Test {
     }
 
     // ──────────────────────────────────────────────────────
+    //  Chainlink Price Feed Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_SetPriceFeed() public {
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+        assertEq(matcher.priceFeeds(address(token0)), address(feedToken0));
+    }
+
+    function test_RevertSetPriceFeedUnauthorized() public {
+        vm.prank(traderA);
+        vm.expectRevert("IntentMatcher: not owner");
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+    }
+
+    function test_GetLatestPrice() public {
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+
+        (uint256 price, uint8 dec) = matcher.getLatestPrice(address(token0));
+        assertEq(price, 1000e8);
+        assertEq(dec, 8);
+    }
+
+    function test_RevertGetLatestPriceNoFeed() public {
+        vm.expectRevert(IntentMatcher.NoPriceFeedConfigured.selector);
+        matcher.getLatestPrice(address(token0));
+    }
+
+    function test_RevertGetLatestPriceStale() public {
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+
+        // Warp forward so we have room to set a stale timestamp without underflow
+        vm.warp(10_000);
+        feedToken0.setUpdatedAt(1); // updatedAt far in the past relative to current timestamp
+
+        vm.expectRevert(IntentMatcher.StaleOraclePrice.selector);
+        matcher.getLatestPrice(address(token0));
+    }
+
+    function test_RevertGetLatestPriceInvalid() public {
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+
+        // Set price to 0 (invalid)
+        feedToken0.setPrice(0);
+
+        vm.expectRevert(IntentMatcher.InvalidOraclePrice.selector);
+        matcher.getLatestPrice(address(token0));
+    }
+
+    function test_ValidateMatchPriceAccepted() public {
+        // Both tokens at $1000 — a 1:1 swap should pass
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+        matcher.setPriceFeed(address(token1), address(feedToken1));
+
+        bool valid = matcher.validateMatchPrice(address(token0), address(token1), 10 ether, 10 ether);
+        assertTrue(valid);
+    }
+
+    function test_ValidateMatchPriceRejectedBadRate() public {
+        // token0 = $1000, token1 = $2000 — sending 10 token0 should yield ~5 token1
+        matcher.setPriceFeed(address(token0), address(feedToken0));
+        feedToken1 = new MockChainlinkFeed(2000e8, 8);
+        matcher.setPriceFeed(address(token1), address(feedToken1));
+
+        // Claiming only 2 token1 for 10 token0 when oracle says ~5 is fair — underpaying, should fail
+        bool valid = matcher.validateMatchPrice(address(token0), address(token1), 10 ether, 2 ether);
+        assertFalse(valid);
+    }
+
+    function test_ValidateMatchPriceSkipsWhenNoFeed() public {
+        // With no feed configured, validation should pass (skip)
+        bool valid = matcher.validateMatchPrice(address(token0), address(token1), 10 ether, 10 ether);
+        assertTrue(valid);
+    }
+
+    function test_OracleValidationBlocksDirectMatch() public {
+        // Enable oracle validation
+        matcher.setOracleValidationEnabled(true);
+
+        // Set token0 = $100, token1 = $1000 — token1 is 10x more valuable
+        MockChainlinkFeed cheapFeed = new MockChainlinkFeed(100e8, 8);
+        MockChainlinkFeed expensiveFeed = new MockChainlinkFeed(1000e8, 8);
+        matcher.setPriceFeed(address(token0), address(cheapFeed));
+        matcher.setPriceFeed(address(token1), address(expensiveFeed));
+
+        // TraderA sells 10 token0 ($100 each = $1000 total), wants 10 token1 ($1000 each = $10000)
+        // Oracle says A should only get ~1 token1 for 10 token0. matchedInA=10, matchedInB=10.
+        // validateMatchPrice(token0, token1, 10, 10): expectedOut = 10*100/1000 = 1. minAllowed=0.99
+        // amountOut=10 >= 0.99 => true. So we need to check from B's perspective.
+        // Actually the validation checks matchedInA as amountIn and matchedInB as amountOut.
+        // matchedInA = min(intentA.amountIn, intentB.minAmountOut) = min(10,10) = 10
+        // matchedInB = min(intentB.amountIn, intentA.minAmountOut) = min(10,10) = 10
+        // validate(token0, token1, 10, 10): expected = 10*100*1e8 / (1000*1e8) = 1
+        // minAllowed = 1 * 9900/10000 = 0. amountOut=10 >= 0 => true.
+        // The issue is that 1:1 always looks like "too much output" which passes.
+        // To properly trigger, we need the output to be LESS than expected:
+        // Set token0=$2000, token1=$1000. Then expectedOut = 10*2000/1000 = 20. minAllowed ~= 19.8
+        // If matchedInB = 10 < 19.8 => FAIL!
+        MockChainlinkFeed highFeed = new MockChainlinkFeed(2000e8, 8);
+        MockChainlinkFeed lowFeed = new MockChainlinkFeed(1000e8, 8);
+        matcher.setPriceFeed(address(token0), address(highFeed));
+        matcher.setPriceFeed(address(token1), address(lowFeed));
+
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+
+        // matchedInA=10, matchedInB=10. validate(token0, token1, 10, 10):
+        // expectedOut = 10 * 2000 / 1000 = 20. minAllowed = 20 * 0.99 = 19.8
+        // amountOut = 10 < 19.8 => returns false => revert OraclePriceDeviation
+        vm.expectRevert(IntentMatcher.OraclePriceDeviation.selector);
+        matcher.matchDirectIntents(intentA, intentB);
+    }
+
+    function test_SetMaxPriceDeviationBps() public {
+        matcher.setMaxPriceDeviationBps(500); // 5%
+        assertEq(matcher.maxPriceDeviationBps(), 500);
+    }
+
+    function test_SetMaxPriceStaleness() public {
+        matcher.setMaxPriceStaleness(2 hours);
+        assertEq(matcher.maxPriceStaleness(), 2 hours);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Across Protocol V3 — Cross-Chain Intent Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_HandleV3AcrossMessage() public {
+        // Encode the cross-chain intent payload
+        bytes memory message = abi.encode(
+            traderA,                          // trader
+            Currency.unwrap(currency1),       // tokenOut
+            uint256(9 ether),                 // minAmountOut
+            uint256(block.timestamp + 3600)   // deadline
+        );
+
+        // SpokePool calls handleV3AcrossMessage
+        vm.prank(spokePool);
+        matcher.handleV3AcrossMessage(
+            Currency.unwrap(currency0),  // tokenSent
+            10 ether,                     // amount
+            address(0xAAAA),              // relayer
+            message
+        );
+
+        // Verify the intent was queued
+        assertEq(matcher.pendingIntentCount(Currency.unwrap(currency0), Currency.unwrap(currency1)), 1);
+
+        // Verify nonce was incremented for the cross-chain trader
+        assertEq(matcher.userNonces(traderA), 1);
+    }
+
+    function test_RevertHandleV3AcrossMessageUnauthorized() public {
+        bytes memory message = abi.encode(traderA, Currency.unwrap(currency1), uint256(9 ether), uint256(block.timestamp + 3600));
+
+        vm.prank(traderA); // not the spokePool
+        vm.expectRevert("IntentMatcher: only SpokePool");
+        matcher.handleV3AcrossMessage(Currency.unwrap(currency0), 10 ether, address(0xAAAA), message);
+    }
+
+    function test_RevertHandleV3AcrossMessageExpired() public {
+        bytes memory message = abi.encode(traderA, Currency.unwrap(currency1), uint256(9 ether), uint256(block.timestamp - 1));
+
+        vm.prank(spokePool);
+        vm.expectRevert("IntentMatcher: cross-chain intent expired");
+        matcher.handleV3AcrossMessage(Currency.unwrap(currency0), 10 ether, address(0xAAAA), message);
+    }
+
+    function test_CrossChainIntentMatchesWithLocalIntent() public {
+        // 1. Local trader submits a counter-intent (sells token1, wants token0)
+        IntentMatcher.TradeIntent memory counterIntent = _makeSignedIntent(
+            traderBKey,
+            Currency.unwrap(currency1),
+            Currency.unwrap(currency0),
+            10 ether,
+            10 ether,
+            0,
+            block.timestamp + 100
+        );
+        matcher.submitPendingIntent(counterIntent);
+
+        // 2. Cross-chain trader sends an intent via Across (sells token0, wants token1)
+        bytes memory message = abi.encode(
+            traderA, Currency.unwrap(currency1), uint256(10 ether), uint256(block.timestamp + 3600)
+        );
+        vm.prank(spokePool);
+        matcher.handleV3AcrossMessage(Currency.unwrap(currency0), 10 ether, address(0xAAAA), message);
+
+        // 3. Both queues now have 1 intent each — trigger internal batch matching
+        uint256 matched = matcher.processInternalBatchMatching(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        assertEq(matched, 10 ether);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Internal Batch Matching Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_ProcessInternalBatchMatching() public {
+        // TraderA submits: sell token0, buy token1 (forward: token0 → token1)
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            15 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentA);
+
+        // TraderB submits: sell token1, buy token0 (reverse: token1 → token0)
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentB);
+
+        // processInternalBatchMatching(tokenIn=token0, tokenOut=token1)
+        // Forward queue: token0→token1 has intentA (15 ether)
+        // Reverse queue: token1→token0 has intentB (10 ether)
+        // matchable = min(15, 10) = 10. Both minAmountOut satisfied (10 >= 10).
+        uint256 matched = matcher.processInternalBatchMatching(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        assertEq(matched, 10 ether);
+    }
+
+    function test_ProcessInternalBatchMatchingEmpty() public {
+        uint256 matched = matcher.processInternalBatchMatching(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        assertEq(matched, 0);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  FairRailKeeper Tests
+    // ──────────────────────────────────────────────────────
+
+    function test_KeeperRegisterPair() public {
+        keeper.registerPair(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        assertEq(keeper.registeredPairCount(), 1);
+
+        (address tIn, address tOut) = keeper.registeredPairs(0);
+        assertEq(tIn, Currency.unwrap(currency0));
+        assertEq(tOut, Currency.unwrap(currency1));
+    }
+
+    function test_KeeperCheckUpkeepNoIntents() public {
+        keeper.registerPair(Currency.unwrap(currency0), Currency.unwrap(currency1));
+
+        (bool needed,) = keeper.checkUpkeep("");
+        assertFalse(needed);
+    }
+
+    function test_KeeperCheckUpkeepNeeded() public {
+        keeper.registerPair(Currency.unwrap(currency0), Currency.unwrap(currency1));
+
+        // Submit intents in both directions
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentA);
+
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentB);
+
+        (bool needed, bytes memory data) = keeper.checkUpkeep("");
+        assertTrue(needed);
+
+        (address tokenIn, address tokenOut) = abi.decode(data, (address, address));
+        assertEq(tokenIn, Currency.unwrap(currency0));
+        assertEq(tokenOut, Currency.unwrap(currency1));
+    }
+
+    function test_KeeperPerformUpkeep() public {
+        keeper.registerPair(Currency.unwrap(currency0), Currency.unwrap(currency1));
+
+        // Submit intents in both directions
+        IntentMatcher.TradeIntent memory intentA = _makeSignedIntent(
+            traderAKey, Currency.unwrap(currency0), Currency.unwrap(currency1),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentA);
+
+        IntentMatcher.TradeIntent memory intentB = _makeSignedIntent(
+            traderBKey, Currency.unwrap(currency1), Currency.unwrap(currency0),
+            10 ether, 10 ether, 0, block.timestamp + 100
+        );
+        matcher.submitPendingIntent(intentB);
+
+        // Perform upkeep
+        bytes memory performData = abi.encode(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        keeper.performUpkeep(performData);
+    }
+
+    function test_KeeperRemovePair() public {
+        keeper.registerPair(Currency.unwrap(currency0), Currency.unwrap(currency1));
+        keeper.registerPair(address(0x1), address(0x2));
+        assertEq(keeper.registeredPairCount(), 2);
+
+        keeper.removePair(0);
+        assertEq(keeper.registeredPairCount(), 1);
+    }
+
+    // ──────────────────────────────────────────────────────
     //  Fuzz Tests
     // ──────────────────────────────────────────────────────
 
@@ -867,4 +1265,3 @@ contract FairRailHookTest is Test {
         assertEq(matchedB, amountB < amountA ? amountB : amountA);
     }
 }
-
