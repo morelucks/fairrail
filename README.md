@@ -33,26 +33,26 @@
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Executive Summary](#-executive-summary)
-- [The Problem](#-the-problem)
-- [How FairRail Works](#-how-fairrail-works)
-- [Architecture](#-architecture)
-- [Smart Contracts](#-smart-contracts)
-- [Partner Integrations](#-partner-integrations)
-- [Deployed Contracts](#-deployed--verified-contracts)
-- [Getting Started](#-getting-started)
-- [Test Suite](#-test-suite)
-- [Gas Benchmarks](#-gas-benchmarks)
-- [Frontend DApp](#-frontend-dapp)
-- [Roadmap](#-roadmap)
-- [Hackathon Submission](#-hackathon-submission)
-- [License](#-license)
+- [Executive Summary](#executive-summary)
+- [The Problem](#the-problem)
+- [How FairRail Works](#how-fairrail-works)
+- [Architecture](#architecture)
+- [Smart Contracts](#smart-contracts)
+- [Partner Integrations](#partner-integrations)
+- [Deployed Contracts](#deployed--verified-contracts)
+- [Getting Started](#getting-started)
+- [Test Suite](#test-suite)
+- [Gas Benchmarks](#gas-benchmarks)
+- [Frontend DApp](#frontend-dapp)
+- [Roadmap](#roadmap)
+- [Hackathon Submission](#hackathon-submission)
+- [License](#license)
 
 ---
 
-## 🧠 Executive Summary
+## Executive Summary
 
 **FairRail** is a Uniswap v4 Hook built for the **Uniswap Hookathon (UHI10)** under the **Sustainable Liquidity & MEV Protection** theme.
 
@@ -64,15 +64,15 @@ Today, liquidity providers (LPs) on AMMs suffer from **Loss-Versus-Rebalancing (
 
 | # | Mechanism | What It Does |
 |---|-----------|-------------|
-| 🔐 | **Private Intent Matching** | Traders submit EIP-712 signed intents. Overlapping orders are matched peer-to-peer *before* hitting the pool — zero slippage, zero MEV. |
-| 🌐 | **Cross-Chain Intent Bridge** | L2 users submit intents via **Across Protocol V3** `depositV3()` → relayed to the hook's `IntentMatcher` on the destination chain. |
-| 🛡️ | **Chainlink Price Safety** | Every batch match is validated against **Chainlink Data Feeds** to prevent toxic fills at manipulated prices. |
-| ⚡ | **Automated Batch Settlement** | **Chainlink Automation** keepers monitor intent queues and trigger batch matching hands-free — fully decentralized. |
-| 🏦 | **LP-Owned MEV Auctions** | Unmatched flow goes through the AMM. Backrunning rights are auctioned to competing searchers via `afterSwap` — **80% of proceeds go to LPs**. |
+| 1 | **Private Intent Matching** | Traders submit EIP-712 signed intents. Overlapping orders are matched peer-to-peer *before* hitting the pool — zero slippage, zero MEV. |
+| 2 | **Cross-Chain Intent Bridge** | L2 users submit intents via **Across Protocol V3** `depositV3()` → relayed to the hook's `IntentMatcher` on the destination chain. |
+| 3 | **Chainlink Price Safety** | Every batch match is validated against **Chainlink Data Feeds** to prevent toxic fills at manipulated prices. |
+| 4 | **Automated Batch Settlement** | **Chainlink Automation** keepers monitor intent queues and trigger batch matching hands-free — fully decentralized. |
+| 5 | **LP-Owned MEV Auctions** | Unmatched flow goes through the AMM. Backrunning rights are auctioned to competing searchers via `afterSwap` — **80% of proceeds go to LPs**. |
 
 ---
 
-## 🔴 The Problem
+## The Problem
 
 ```
                     ┌──────────────────────────────────────────────────┐
@@ -99,7 +99,7 @@ Today, liquidity providers (LPs) on AMMs suffer from **Loss-Versus-Rebalancing (
 
 ---
 
-## ⚙️ How FairRail Works
+## How FairRail Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -122,14 +122,14 @@ Today, liquidity providers (LPs) on AMMs suffer from **Loss-Versus-Rebalancing (
 │                                                        │            │
 │  6. Searchers bid for backrunning  ──► MevAuction.submitBid()       │
 │                                                        │            │
-│  7. afterSwap() settles auction    ──► 80% to LPs 🎉               │
+│  7. afterSwap() settles auction    ──► 80% to LPs                   │
 │                                        20% protocol treasury        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 sequenceDiagram
@@ -168,7 +168,7 @@ sequenceDiagram
 
 ---
 
-## 📦 Smart Contracts
+## Smart Contracts
 
 ### Project Structure
 
@@ -214,7 +214,7 @@ fairrail/
 
 ### Contract Breakdown
 
-#### 🪝 `FairRailHook.sol` — Core Uniswap v4 Hook
+#### `FairRailHook.sol` — Core Uniswap v4 Hook
 
 The central hook implementing `beforeSwap` and `afterSwap` lifecycle callbacks:
 
@@ -225,7 +225,7 @@ The central hook implementing `beforeSwap` and `afterSwap` lifecycle callbacks:
 
 **Hook Permissions**: `BEFORE_SWAP` · `AFTER_SWAP` · `BEFORE_SWAP_RETURNS_DELTA`
 
-#### 🔄 `IntentMatcher.sol` — Intent Engine (737 LOC)
+#### `IntentMatcher.sol` — Intent Engine (737 LOC)
 
 The largest contract, handling the full intent lifecycle:
 
@@ -238,7 +238,7 @@ The largest contract, handling the full intent lifecycle:
   3. `processInternalBatchMatching()` — Keeper-triggered autonomous batch matching
 - **Queue Management**: `cleanupPendingIntents()` compacts the storage queue to reclaim gas.
 
-#### 🤖 `FairRailKeeper.sol` — Chainlink Automation Keeper
+#### `FairRailKeeper.sol` — Chainlink Automation Keeper
 
 Custom upkeep contract compatible with **Chainlink Automation v2.1**:
 
@@ -249,7 +249,7 @@ Custom upkeep contract compatible with **Chainlink Automation v2.1**:
 | `registerPair()` | Admin | Registers new token pairs for automated monitoring |
 | `removePair()` | Admin | Removes token pairs from monitoring |
 
-#### 🏦 `MevAuction.sol` — LP-Owned MEV Auction
+#### `MevAuction.sol` — LP-Owned MEV Auction
 
 Competitive on-chain bidding system for searchers:
 
@@ -262,7 +262,7 @@ Competitive on-chain bidding system for searchers:
 
 ---
 
-## 🤝 Partner Integrations
+## Partner Integrations
 
 ### Chainlink — Oracle & Automation
 
@@ -285,16 +285,16 @@ This eliminates the need for L2 users to bridge tokens manually, reducing latenc
 
 ---
 
-## 🚀 Deployed & Verified Contracts
+## Deployed & Verified Contracts
 
 All contracts are deployed live on **Ethereum Sepolia Testnet** and verified on Etherscan:
 
 | Contract | Address | Status |
 | :--- | :--- | :---: |
-| **`FairRailHook`** | [`0x3a364944...883d00c8`](https://sepolia.etherscan.io/address/0x3a364944a3efbd03566f68d75beed7c7883d00c8#code) | ✅ Verified |
-| **`IntentMatcher`** | [`0x6d3e48af...18c5c3f`](https://sepolia.etherscan.io/address/0x6d3e48af765e2f3a43a9e09668130a8f718c5c3f#code) | ✅ Verified |
-| **`MevAuction`** | [`0x303f3d0c...d2bb79`](https://sepolia.etherscan.io/address/0x303f3d0cbb8527d4511ec62bda09f1f8d5d2bb79#code) | ✅ Verified |
-| **`FairRailKeeper`** | [`0x7355e5f6...fa5913c0`](https://sepolia.etherscan.io/address/0x7355e5f60a90eb7326acfc97b4839833fa5913c0#code) | ✅ Verified |
+| **`FairRailHook`** | [`0x3a364944...883d00c8`](https://sepolia.etherscan.io/address/0x3a364944a3efbd03566f68d75beed7c7883d00c8#code) | Verified |
+| **`IntentMatcher`** | [`0x6d3e48af...18c5c3f`](https://sepolia.etherscan.io/address/0x6d3e48af765e2f3a43a9e09668130a8f718c5c3f#code) | Verified |
+| **`MevAuction`** | [`0x303f3d0c...d2bb79`](https://sepolia.etherscan.io/address/0x303f3d0cbb8527d4511ec62bda09f1f8d5d2bb79#code) | Verified |
+| **`FairRailKeeper`** | [`0x7355e5f6...fa5913c0`](https://sepolia.etherscan.io/address/0x7355e5f60a90eb7326acfc97b4839833fa5913c0#code) | Verified |
 | **`PoolManager`** | [`0x00000000...e08A90`](https://sepolia.etherscan.io/address/0x000000000004444c5dc75cB358380D2e3dE08A90) | Canonical Uniswap v4 |
 
 > **Chain**: Ethereum Sepolia (Chain ID `11155111`)
@@ -303,7 +303,7 @@ All contracts are deployed live on **Ethereum Sepolia Testnet** and verified on 
 
 ---
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -373,7 +373,7 @@ forge script script/DeployFairRail.s.sol:DeployFairRail \
 
 ---
 
-## ✅ Test Suite
+## Test Suite
 
 The test suite (`test/FairRailHook.t.sol`) provides **68 passing tests** covering every aspect of the protocol:
 
@@ -400,7 +400,7 @@ Finished in 678.19ms (1.56s CPU time)
 
 ---
 
-## ⛽ Gas Benchmarks
+## Gas Benchmarks
 
 | Contract | Function | Avg Gas | Median Gas |
 | :--- | :--- | :---: | :---: |
@@ -417,43 +417,43 @@ Finished in 678.19ms (1.56s CPU time)
 
 ---
 
-## 🖥️ Frontend DApp
+## Frontend DApp
 
 The frontend is a **React + Vite** Web3 application providing a visual interface for all protocol interactions:
 
 | Tab | Component | Functionality |
 |-----|-----------|--------------|
-| 🏠 **Home** | `LandingHero` | Protocol overview, feature showcase, and animated statistics |
-| 📝 **Trader Portal** | `TraderPortal` | Submit EIP-712 signed trade intents, view execution status |
-| 📋 **Intent Queue** | `IntentQueue` | Real-time view of pending intents across token pairs |
-| 🏦 **MEV Auction** | `MevAuctionPortal` | Searcher bidding interface with live auction state |
-| 💰 **LP Dashboard** | `LpDashboard` | Track accumulated MEV revenue, claim yields, view pool metrics |
-| 🤖 **Keeper** | `KeeperPanel` | Chainlink Automation status, registered pairs, upkeep history |
+| **Home** | `LandingHero` | Protocol overview, feature showcase, and animated statistics |
+| **Trader Portal** | `TraderPortal` | Submit EIP-712 signed trade intents, view execution status |
+| **Intent Queue** | `IntentQueue` | Real-time view of pending intents across token pairs |
+| **MEV Auction** | `MevAuctionPortal` | Searcher bidding interface with live auction state |
+| **LP Dashboard** | `LpDashboard` | Track accumulated MEV revenue, claim yields, view pool metrics |
+| **Keeper** | `KeeperPanel` | Chainlink Automation status, registered pairs, upkeep history |
 
 **Tech Stack**: React 18 · Vite · ethers.js · Vanilla CSS with glassmorphism design
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 ```
 Phase 1 (Current — UHI10)          Phase 2 (Next)              Phase 3 (Future)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Uniswap v4 Hook (beforeSwap     🔒 FHE Encrypted Intent      ⚡ EigenLayer AVS for
-   + afterSwap)                       Orderbook (Inco/Zama)        decentralized off-chain
-✅ EIP-712 Intent Matching         🔒 Confidential batch            intent batching
-✅ Across V3 Cross-Chain Bridge       matching — eliminate         ⚡ Automated slashing for
-✅ Chainlink Price Feed Safety        frontrunning prior to          searcher execution
-✅ Chainlink Automation Keeper        settlement                     verification
-✅ LP-Owned MEV Auction (80/20)    🔒 Multi-pool intent           ⚡ Multi-chain deployment
-✅ Web3 React DApp                    aggregation                    (Optimism, Arbitrum, Base)
-✅ 68/68 Tests Passing
-✅ Sepolia Deployment & Verification
+[x] Uniswap v4 Hook (beforeSwap    [ ] FHE Encrypted Intent      [ ] EigenLayer AVS for
+    + afterSwap)                        Orderbook (Inco/Zama)         decentralized off-chain
+[x] EIP-712 Intent Matching        [ ] Confidential batch             intent batching
+[x] Across V3 Cross-Chain Bridge        matching — eliminate      [ ] Automated slashing for
+[x] Chainlink Price Feed Safety         frontrunning prior to         searcher execution
+[x] Chainlink Automation Keeper         settlement                    verification
+[x] LP-Owned MEV Auction (80/20)   [ ] Multi-pool intent         [ ] Multi-chain deployment
+[x] Web3 React DApp                     aggregation                   (Optimism, Arbitrum, Base)
+[x] 68/68 Tests Passing
+[x] Sepolia Deployment & Verification
 ```
 
 ---
 
-## 📝 Hackathon Submission
+## Hackathon Submission
 
 | Field | Details |
 |-------|---------|
@@ -470,19 +470,19 @@ Phase 1 (Current — UHI10)          Phase 2 (Next)              Phase 3 (Future
 
 ### Partner Integrations
 
-- ✅ **Chainlink** — Data Feeds (AggregatorV3Interface) + Automation (Custom Logic Keeper)
-- ✅ **Across Protocol** — V3 Cross-Chain Intent Bridge (SpokePool + AcrossMessageHandler)
+- **Chainlink** — Data Feeds (AggregatorV3Interface) + Automation (Custom Logic Keeper)
+- **Across Protocol** — V3 Cross-Chain Intent Bridge (SpokePool + AcrossMessageHandler)
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ for the Uniswap Hookathon (UHI10)</strong>
+  <strong>Built for the Uniswap Hookathon (UHI10)</strong>
   <br />
   <em>Making DeFi fair, one rail at a time.</em>
 </p>
