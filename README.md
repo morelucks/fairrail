@@ -47,8 +47,7 @@
 - [Gas Benchmarks](#gas-benchmarks)
 - [Frontend DApp](#frontend-dapp)
 - [Roadmap](#roadmap)
-- [Hackathon Submission](#hackathon-submission)
-- [License](#license)
+ - [License](#license)
 
 ---
 
@@ -452,22 +451,7 @@ Phase 1 (Current — UHI10)          Phase 2 (Next)              Phase 3 (Future
 ```
 
 ---
-
-## Hackathon Submission
-
-| Field | Details |
-|-------|---------|
-| **Project Name** | FairRail |
-| **Project ID** | HK-UHI10-1068 |
-| **Hackathon** | Uniswap Hookathon (UHI10) |
-| **Theme** | Sustainable Liquidity & MEV Protection |
-| **Author** | Kamshak Lucky Isuwa |
-| **GitHub** | [@morelucks](https://github.com/morelucks) |
-| **X/Twitter** | [@LuckifyT](https://x.com/LuckifyT) |
-| **Email** | luckykamshak@gmail.com |
-| **Team** | Solo |
-| **Submission Type** | Hook |
-
+ 
 ### Partner Integrations
 
 - **Chainlink** — Data Feeds (AggregatorV3Interface) + Automation (Custom Logic Keeper)
