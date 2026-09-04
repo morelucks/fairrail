@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import Header from './components/Header';
@@ -76,6 +76,7 @@ export default function App() {
   const [signer, setSigner] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const disconnectedRef = useRef(false);
 
   const activePrivyWallet = wallets && wallets.length > 0 ? wallets[0] : null;
 
@@ -121,6 +122,7 @@ export default function App() {
 
     try {
       setIsConnecting(true);
+      disconnectedRef.current = false;
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await browserProvider.send('eth_requestAccounts', []);
       const userSigner = await browserProvider.getSigner();
@@ -167,6 +169,7 @@ export default function App() {
   // Auto-connect on page load if browser wallet is already unlocked/authorized
   useEffect(() => {
     async function checkAutoConnect() {
+      if (disconnectedRef.current) return;
       if (window.ethereum) {
         try {
           const browserProvider = new ethers.BrowserProvider(window.ethereum);
@@ -234,6 +237,7 @@ export default function App() {
   useEffect(() => {
     if (window.ethereum) {
       const handleAccounts = (accounts) => {
+        if (disconnectedRef.current) return;
         if (accounts.length > 0) {
           setAccount(accounts[0]);
           if (provider) {
@@ -248,6 +252,7 @@ export default function App() {
       };
 
       const handleChain = (hexChainId) => {
+        if (disconnectedRef.current) return;
         if (typeof hexChainId === 'string') {
           setChainId(parseInt(hexChainId, 16));
         } else {
@@ -269,6 +274,7 @@ export default function App() {
 
   // Logout / Disconnect Handler
   const handleLogout = async () => {
+    disconnectedRef.current = true;
     if (logout && activePrivyWallet) {
       try {
         await logout();
@@ -281,6 +287,7 @@ export default function App() {
     setBalance('0');
     setProvider(null);
     setChainId(null);
+    setActiveTab('overview');
   };
 
   // Progressive Access: Auto-transition to Trader Portal when wallet connects on overview
