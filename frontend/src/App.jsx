@@ -196,6 +196,7 @@ export default function App() {
   // Sync Privy connected wallet when activePrivyWallet changes
   useEffect(() => {
     async function initPrivyWallet() {
+      if (disconnectedRef.current) return;
       if (activePrivyWallet && !account) {
         try {
           const eip1193Provider = await activePrivyWallet.getEthereumProvider();
@@ -275,6 +276,20 @@ export default function App() {
   // Logout / Disconnect Handler
   const handleLogout = async () => {
     disconnectedRef.current = true;
+
+    // Revoke MetaMask / browser wallet permissions to prevent auto-reconnect
+    if (window.ethereum && window.ethereum.request) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      } catch (err) {
+        // wallet_revokePermissions not supported by all wallets — safe to ignore
+        console.debug('wallet_revokePermissions not supported:', err.message);
+      }
+    }
+
     if (logout && activePrivyWallet) {
       try {
         await logout();
@@ -282,6 +297,7 @@ export default function App() {
         console.warn('Privy logout error:', err);
       }
     }
+
     setAccount('');
     setSigner(null);
     setBalance('0');
@@ -292,6 +308,7 @@ export default function App() {
 
   // Progressive Access: Auto-transition to Trader Portal when wallet connects on overview
   useEffect(() => {
+    if (disconnectedRef.current) return;
     if (account && activeTab === 'overview') {
       setActiveTab('trader');
     }
