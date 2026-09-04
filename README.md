@@ -463,7 +463,7 @@ Phase 1 (Current — UHI10)          Phase 2 (Next)              Phase 3 (Future
 | **Theme** | Sustainable Liquidity & MEV Protection |
 | **Author** | Kamshak Lucky Isuwa |
 | **GitHub** | [@morelucks](https://github.com/morelucks) |
-| **X/Twitter** | [@morelucks](https://x.com/morelucks) |
+| **X/Twitter** | [@LuckifyT](https://x.com/LuckifyT) |
 | **Email** | luckykamshak@gmail.com |
 | **Team** | Solo |
 | **Submission Type** | Hook |
